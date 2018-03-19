@@ -70,15 +70,16 @@ inline void AddtoRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	}
 
 	if (cur_stream->on_rto_idx < 0) {
+#if 0
 		if (cur_stream->on_timeout_list) {
 			printf("Stream %u: cannot be in both "
 					"rto and timewait list.\n", cur_stream->id);
 			return ;
 		}
-
+#endif
 		int diff = (int32_t)(cur_stream->snd->ts_rto - tcp->rto_store->rto_now_ts);
 		if (diff < RTO_HASH) {
-			int offset = (diff + tcp->rto_store->rto_now_idx) % RTO_HASH;
+			int offset = cur_stream->snd->ts_rto % RTO_HASH;//(diff + tcp->rto_store->rto_now_idx) % RTO_HASH;
 			cur_stream->on_rto_idx = offset;
 			TAILQ_INSERT_TAIL(&(tcp->rto_store->rto_list[offset]),
 				cur_stream, snd->timer_link);
@@ -112,7 +113,7 @@ inline void AddtoTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, 
 		TAILQ_INSERT_TAIL(&tcp->timewait_list, cur_stream, snd->timer_link);	
 	} else {
 		if (cur_stream->on_rto_idx >= 0) {
-			printf("Stream %u: cannot be in both "
+			nty_trace_timer("Stream %u: cannot be in both "
 					"timewait and rto list.\n", cur_stream->id);
 			//assert(0);
 			RemoveFromRTOList(tcp, cur_stream);
@@ -180,7 +181,7 @@ inline void UpdateRetransmissionTimer(nty_tcp_manager *tcp,
 		AddtoRTOList(tcp, cur_stream);
 
 	} else {
-		printf("All packets are acked. snd_una: %u, snd_nxt: %u\n", 
+		nty_trace_timer("All packets are acked. snd_una: %u, snd_nxt: %u\n", 
 				cur_stream->snd->snd_una, cur_stream->snd_nxt);
 	}
 }
@@ -234,7 +235,7 @@ int HandleRTO(nty_tcp_manager *tcp, uint32_t cur_ts, nty_tcp_stream *cur_stream)
 	}
 	cur_stream->snd->cwnd = cur_stream->snd->mss;
 
-	printf("Stream %d Timeout. cwnd: %u, ssthresh: %u\n", 
+	nty_trace_timer("Stream %d Timeout. cwnd: %u, ssthresh: %u\n", 
 			cur_stream->id, cur_stream->snd->cwnd, cur_stream->snd->ssthresh);
 
 	if (cur_stream->state == NTY_TCP_SYN_SENT) {
@@ -242,7 +243,7 @@ int HandleRTO(nty_tcp_manager *tcp, uint32_t cur_ts, nty_tcp_stream *cur_stream)
 		if (cur_stream->snd->nrtx > TCP_MAX_SYN_RETRY) {
 			cur_stream->state = NTY_TCP_CLOSED;
 			cur_stream->close_reason = TCP_CONN_FAIL;
-			printf("Stream %d: SYN retries exceed maximum retries.\n", 
+			nty_trace_timer("Stream %d: SYN retries exceed maximum retries.\n", 
 					cur_stream->id);
 			if (cur_stream->socket) {
 				//RaiseErrorEvent(mtcp, cur_stream);
@@ -252,39 +253,39 @@ int HandleRTO(nty_tcp_manager *tcp, uint32_t cur_ts, nty_tcp_stream *cur_stream)
 
 			return -1;
 		}
-		printf("Stream %d Retransmit SYN. snd_nxt: %u, snd_una: %u\n", 
+		nty_trace_timer("Stream %d Retransmit SYN. snd_nxt: %u, snd_una: %u\n", 
 				cur_stream->id, cur_stream->snd_nxt, cur_stream->snd->snd_una);
 
 	} else if (cur_stream->state == NTY_TCP_SYN_RCVD) {
-		printf("Stream %d: Retransmit SYN/ACK. snd_nxt: %u, snd_una: %u\n", 
+		nty_trace_timer("Stream %d: Retransmit SYN/ACK. snd_nxt: %u, snd_una: %u\n", 
 				cur_stream->id, cur_stream->snd_nxt, cur_stream->snd->snd_una);
 	}  else if (cur_stream->state == NTY_TCP_ESTABLISHED) {
 		/* Data lost */
-		printf("Stream %d: Retransmit data. snd_nxt: %u, snd_una: %u\n", 
+		nty_trace_timer("Stream %d: Retransmit data. snd_nxt: %u, snd_una: %u\n", 
 				cur_stream->id, cur_stream->snd_nxt, cur_stream->snd->snd_una);
 
 	} else if (cur_stream->state == NTY_TCP_CLOSE_WAIT) {
 		/* Data lost */
-		printf("Stream %d: Retransmit data. snd_nxt: %u, snd_una: %u\n", 
+		nty_trace_timer("Stream %d: Retransmit data. snd_nxt: %u, snd_una: %u\n", 
 				cur_stream->id, cur_stream->snd_nxt, cur_stream->snd->snd_una);
 
 	} else if (cur_stream->state == NTY_TCP_LAST_ACK) {
 		/* FIN/ACK lost */
-		printf("Stream %d: Retransmit FIN/ACK. "
+		nty_trace_timer("Stream %d: Retransmit FIN/ACK. "
 				"snd_nxt: %u, snd_una: %u\n", 
 				cur_stream->id, cur_stream->snd_nxt, cur_stream->snd->snd_una);
 
 	} else if (cur_stream->state == NTY_TCP_FIN_WAIT_1) {
 		/* FIN lost */
-		printf("Stream %d: Retransmit FIN. snd_nxt: %u, snd_una: %u\n", 
+		nty_trace_timer("Stream %d: Retransmit FIN. snd_nxt: %u, snd_una: %u\n", 
 				cur_stream->id, cur_stream->snd_nxt, cur_stream->snd->snd_una);
 	} else if (cur_stream->state == NTY_TCP_CLOSING) {
-		printf("Stream %d: Retransmit ACK. snd_nxt: %u, snd_una: %u\n", 
+		nty_trace_timer("Stream %d: Retransmit ACK. snd_nxt: %u, snd_una: %u\n", 
 				cur_stream->id, cur_stream->snd_nxt, cur_stream->snd->snd_una);
 		//TRACE_DBG("Stream %d: Retransmitting at CLOSING\n", cur_stream->id);
 
 	} else {
-		printf("Stream %d: not implemented state! state: %d, rto: %u\n", 
+		nty_trace_timer("Stream %d: not implemented state! state: %d, rto: %u\n", 
 				cur_stream->id, 
 				cur_stream->state, cur_stream->snd->rto);
 		assert(0);
@@ -302,7 +303,7 @@ int HandleRTO(nty_tcp_manager *tcp, uint32_t cur_ts, nty_tcp_stream *cur_stream)
 			cur_stream->state == NTY_TCP_LAST_ACK) {
 
 		if (cur_stream->snd->fss == 0) {
-			printf("Stream %u: fss not set.\n", cur_stream->id);
+			nty_trace_timer("Stream %u: fss not set.\n", cur_stream->id);
 		}
 		
 		if (TCP_SEQ_LT(cur_stream->snd_nxt, cur_stream->snd->fss)) {
@@ -378,7 +379,7 @@ void CheckRtmTimeout(nty_tcp_manager *tcp, uint32_t cur_ts, int thresh) {
 				HandleRTO(tcp, cur_ts, walk);
 				
 			} else {
-				printf("Stream %d: not on rto list.\n", walk->id);
+				nty_trace_timer("Stream %d: not on rto list.\n", walk->id);
 			}
 		}
 
@@ -417,14 +418,14 @@ void CheckTimewaitExpire(nty_tcp_manager *tcp, uint32_t cur_ts, int thresh)
 
 					walk->state = NTY_TCP_CLOSED;
 					walk->close_reason = TCP_ACTIVE_CLOSE;
-					printf("Stream %d: TCP_ST_CLOSED\n", walk->id);
+					nty_trace_timer("Stream %d: TCP_ST_CLOSED\n", walk->id);
 					DestroyTcpStream(tcp, walk);
 				}
 			} else {
 				break;
 			}
 		} else {
-			printf("Stream %d: not on timewait list.\n", walk->id);
+			nty_trace_timer("Stream %d: not on timewait list.\n", walk->id);
 		}
 	}
 

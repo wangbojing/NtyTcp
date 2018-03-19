@@ -66,7 +66,7 @@ int main() {
 			break;
 		}
 
-		//nty_send(clientfd, buffer, ret);
+		nty_send(clientfd, buffer, ret);
 		//buffer[ret] = '\0';
 		printf("recv : %s\n", buffer);
 	}

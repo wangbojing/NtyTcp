@@ -557,7 +557,7 @@ ssize_t nty_send(int sockid, const char *buf, size_t len) {
 	if (!(socket->opts & NTY_TCP_NONBLOCK)) {
 		while (snd->snd_wnd <= 0) {
 			if (!cur_stream || cur_stream->state != NTY_TCP_ESTABLISHED) {
-				pthread_mutex_lock(&snd->write_lock);
+				pthread_mutex_unlock(&snd->write_lock);
 				errno = EINTR;
 				return -1;
 			}

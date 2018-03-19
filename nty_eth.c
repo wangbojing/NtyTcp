@@ -175,6 +175,7 @@ static void *nty_tcp_run(void *arg) {
 			gettimeofday(&cur_ts, NULL);
 			uint32_t ts = TIMEVAL_TO_TS(&cur_ts);
 
+			//nty_trace_eth("flow cnt : %d\n", tcp->flow_cnt);
 			if (tcp->flow_cnt > 0) {
 				CheckRtmTimeout(tcp, ts, NTY_MAX_CONCURRENCY);
 				CheckTimewaitExpire(tcp, ts, NTY_MAX_CONCURRENCY);
@@ -184,7 +185,7 @@ static void *nty_tcp_run(void *arg) {
 			}
 
 			nty_tcp_write_chunks(ts);
-			nty_nic_send_pkts(ctx, 0);
+			//nty_nic_send_pkts(ctx, 0);
 
 
 		} else if (pfd.revents & POLLOUT) {

@@ -110,6 +110,10 @@ typedef enum _nty_tcp_state {
 
 #define TS_TO_USEC(t)			((t) * TIME_TICK)
 #define TS_TO_MSEC(t)			(TS_TO_USEC(t) / 1000)
+#define MSEC_TO_USEC(t)			((t) * 1000)
+#define USEC_TO_SEC(t)			((t) / 1000000)
+
+#define TCP_INITIAL_RTO 		(MSEC_TO_USEC(500) / TIME_TICK)
 
 #if NTY_ENABLE_BLOCKING
 

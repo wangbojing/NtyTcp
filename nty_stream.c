@@ -251,6 +251,8 @@ nty_tcp_stream *CreateTcpStream(nty_tcp_manager *tcp, nty_socket_map *socket, in
 	stream->rcv->rcv_wnd = TCP_INITIAL_WINDOW;
 	stream->rcv->snd_wl1 = stream->rcv->irs - 1;
 
+	stream->snd->rto = TCP_INITIAL_RTO;
+
 #if NTY_ENABLE_BLOCKING
 
 	if (pthread_mutex_init(&stream->rcv->read_lock, NULL)) {

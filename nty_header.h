@@ -178,6 +178,8 @@ struct icmppkt {
 #define nty_trace_tcp(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
 #define nty_trace_buffer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
 #define nty_trace_eth(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_ip(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_timer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
 
 #else
 #define ntydbg(format, ...) 
@@ -185,6 +187,10 @@ struct icmppkt {
 #define nty_trace_tcp(format, ...) 
 #define nty_trace_buffer(format, ...)
 #define nty_trace_eth(format, ...)
+#define nty_trace_ip(format, ...)
+#define nty_trace_timer(format, ...)
+
+
 #endif
 
 

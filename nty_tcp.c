@@ -267,6 +267,7 @@ inline void nty_tcp_addto_sendlist(nty_tcp_manager *tcp, nty_tcp_stream *cur_str
 		return ;
 	}
 
+	nty_trace_tcp("nty_tcp_addto_sendlist --> %d\n", cur_stream->snd->on_send_list);
 	if (!cur_stream->snd->on_send_list) {
 		cur_stream->snd->on_send_list = 1;
 		TAILQ_INSERT_TAIL(&sender->send_list , cur_stream, snd->send_link);
@@ -468,6 +469,8 @@ int nty_tcp_send_tcppkt(nty_tcp_stream *cur_stream,
 		uint32_t cur_ts, uint8_t flags, uint8_t *payload, uint16_t payloadlen) {
 
 	uint16_t optlen = nty_calculate_option(flags);
+
+	nty_trace_tcp("payload:%d, mss:%d, optlen:%d, data:%s\n", payloadlen, cur_stream->snd->mss, optlen, payload);
 	if (payloadlen > cur_stream->snd->mss + optlen) {
 		nty_trace_tcp("Payload size exceeds MSS\n");
 		return -1;
@@ -544,7 +547,7 @@ int nty_tcp_send_tcppkt(nty_tcp_stream *cur_stream,
 
 	nty_tcp_generate_options(cur_stream, cur_ts, flags, 
 		(uint8_t*)tcph+TCP_HEADER_LEN, optlen);
-
+	
 	tcph->doff = (TCP_HEADER_LEN + optlen) >> 2;
 	if (payloadlen > 0) {
 		memcpy((uint8_t *)tcph + TCP_HEADER_LEN + optlen, payload, payloadlen);
@@ -553,13 +556,13 @@ int nty_tcp_send_tcppkt(nty_tcp_stream *cur_stream,
 	tcph->check = nty_tcp_calculate_checksum((uint16_t *)tcph, 
 					TCP_HEADER_LEN + optlen + payloadlen, 
 					cur_stream->saddr, cur_stream->daddr);
-	cur_stream->snd += payloadlen;
+	cur_stream->snd_nxt += payloadlen;
 	
 	if (tcph->syn || tcph->fin) {
 		cur_stream->snd_nxt ++;
 		payloadlen ++;
 	}
-
+	
 	if (payloadlen > 0) {
 		if (cur_stream->state > NTY_TCP_ESTABLISHED) {
 			nty_trace_tcp("Payload after ESTABLISHED: length: %d, snd_nxt: %u\n", 
@@ -568,8 +571,8 @@ int nty_tcp_send_tcppkt(nty_tcp_stream *cur_stream,
 
 		cur_stream->snd->ts_rto = cur_ts + cur_stream->snd->rto;
 		nty_trace_tcp("Updating retransmission timer. "
-				"cur_ts: %u, rto: %u, ts_rto: %u\n", 
-				cur_ts, cur_stream->snd->rto, cur_stream->snd->ts_rto);
+				"cur_ts: %u, rto: %u, ts_rto: %u, mss:%d\n", 
+				cur_ts, cur_stream->snd->rto, cur_stream->snd->ts_rto, cur_stream->snd->mss);
 
 		AddtoRTOList(tcp, cur_stream);
 	}
@@ -613,9 +616,9 @@ static inline nty_tcp_stream *nty_tcp_passive_open(nty_tcp_manager *tcp, uint32_
 	cur_stream->snd->peer_wnd = window;
 	cur_stream->rcv_nxt = cur_stream->rcv->irs;
 	cur_stream->snd->cwnd = 1;
-	nty_trace_tcp("nty_tcp_passive_open : %d\n", cur_stream->rcv_nxt);
 	nty_tcp_parse_options(cur_stream, cur_ts, (uint8_t*)tcph+TCP_HEADER_LEN,
 		(tcph->doff << 2) - TCP_HEADER_LEN);
+	nty_trace_tcp("nty_tcp_passive_open : %d, %d\n", cur_stream->rcv_nxt, cur_stream->snd->mss);
 
 	return cur_stream;
 }
@@ -771,7 +774,7 @@ static void nty_tcp_flush_send_event(nty_tcp_send *snd) {
 	pthread_mutex_lock(&snd->write_lock);
 
 	if (snd->snd_wnd > 0) {
-		pthread_cond_signal(&snd->write_lock);
+		pthread_cond_signal(&snd->write_cond);
 	}
 	
 	pthread_mutex_unlock(&snd->write_lock);
@@ -1358,6 +1361,7 @@ static void nty_tcp_process_ack(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream
 					cur_stream->id, ack_seq, snd->peer_wnd, cwindow_prev, 
 					cur_stream->snd_nxt - snd->snd_una);
 			//RaiseWriteEvent(mtcp, cur_stream);
+			nty_tcp_flush_send_event(snd);
 		}
 	}
 
@@ -1469,9 +1473,10 @@ static void nty_tcp_process_ack(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream
 
 		if (snd_wnd_prev <= 0) {
 			//Raise Write Event
+			nty_tcp_flush_send_event(snd);
 		}
 
-		pthread_mutex_lock(&snd->write_lock);
+		pthread_mutex_unlock(&snd->write_lock);
 		UpdateRetransmissionTimer(tcp, cur_stream, cur_ts);
 	}
 	
@@ -1483,7 +1488,6 @@ int nty_tcp_process(nty_nic_context *ctx, unsigned char *stream) {
 	struct iphdr *iph = (struct iphdr *)(stream + sizeof(struct ethhdr));
 	struct tcphdr *tcph = (struct tcphdr *)(stream + sizeof(struct ethhdr) + sizeof(struct iphdr));
 
-	//nty_trace_tcp(" iphdr : %d, ihl : %d\n", sizeof(struct iphdr), (iph->ihl<<2));
 	assert(sizeof(struct iphdr) == (iph->ihl<<2));
 
 	int ip_len = ntohs(iph->tot_len);
@@ -1538,6 +1542,8 @@ int nty_tcp_process(nty_nic_context *ctx, unsigned char *stream) {
 			return 1;
 		}
 	}
+
+	nty_trace_tcp("nty_tcp_process state : %d\n", cur_stream->state);
 
 	if (tcph->syn) {
 		cur_stream->snd->peer_wnd = window;
@@ -1822,6 +1828,7 @@ int nty_tcp_handle_apicall(uint32_t cur_ts) {
 	}
 
 	while ((stream = StreamDequeue(tcp->sendq))) {
+		nty_trace_tcp("buf: %s, mss:%d\n", stream->snd->sndbuf->data, stream->snd->mss);
 		stream->snd->on_sendq = 0;
 		nty_tcp_addto_sendlist(tcp, stream);
 	}
@@ -2010,8 +2017,8 @@ int nty_tcp_flush_sendbuffer(nty_tcp_stream *cur_stream, uint32_t cur_ts) {
 		buffered_len = snd->sndbuf->head_seq + snd->sndbuf->len - seq;
 		if (cur_stream->state == NTY_TCP_ESTABLISHED) {
 			nty_trace_tcp("head_seq: %u, len: %u, seq: %u, "
-					"buffered_len: %u\n", snd->sndbuf->head_seq, 
-					snd->sndbuf->len, seq, buffered_len);
+					"buffered_len: %u, mss:%d, cur_mss:%d\n", snd->sndbuf->head_seq, 
+					snd->sndbuf->len, seq, buffered_len, snd->mss, cur_stream->snd->mss);
 		}
 		if (buffered_len == 0) break;
 
@@ -2052,11 +2059,12 @@ int nty_tcp_flush_sendbuffer(nty_tcp_stream *cur_stream, uint32_t cur_ts) {
 		}
 		packets ++;
 
+		nty_trace_api("window:%d, len:%d\n", window, len);
 		window -= len;
 	}
 
 out:
-	pthread_mutex_lock(&snd->write_lock);
+	pthread_mutex_unlock(&snd->write_lock);
 
 	return packets;
 } 
@@ -2195,6 +2203,7 @@ int nty_tcp_write_datalist(nty_sender *sender, uint32_t cur_ts, int thresh) {
 		
 		TAILQ_REMOVE(&sender->send_list, cur_stream, snd->send_link);
 
+		nty_trace_tcp("send_list:%d, state:%d\n", cur_stream->snd->on_send_list, cur_stream->state);
 		if (cur_stream->snd->on_send_list) {
 			ret = 0;
 
@@ -2202,6 +2211,8 @@ int nty_tcp_write_datalist(nty_sender *sender, uint32_t cur_ts, int thresh) {
 
 				if (cur_stream->snd->on_control_list) {
 					ret = -1;
+				} else {
+					ret = nty_tcp_flush_sendbuffer(cur_stream, cur_ts);
 				}
 				
 			} else if (cur_stream->state == NTY_TCP_CLOSE_WAIT ||
@@ -2364,6 +2375,7 @@ void nty_tcp_write_chunks(uint32_t cur_ts) {
 	if (tcp->g_sender->ack_list_cnt) {
 		nty_tcp_write_acklist(tcp->g_sender, cur_ts, thresh);
 	}
+
 	if (tcp->g_sender->send_list_cnt) {
 		nty_tcp_write_datalist(tcp->g_sender, cur_ts, thresh);
 	}
