@@ -57,7 +57,7 @@
 
 nty_mempool *nty_mempool_create(int chunk_size, size_t total_size, int is_hugepage) {
 
-	if (chunk_size < sizeof(nty_mem_chunk)) {
+	if (chunk_size < (int)sizeof(nty_mem_chunk)) {
 		return NULL;
 	}
 	if (chunk_size % 4 != 0) {
@@ -159,7 +159,7 @@ uint32_t nty_mempool_isdanger(nty_mempool *mp) {
 	uint32_t danger_num = mp->mp_total_chunks * DANGER_THREADSHOLD;
 	uint32_t safe_num = mp->mp_total_chunks * SAFE_THREADSHOLD;
 
-	if (danger_num < mp->mp_total_chunks - mp->mp_free_chunks) {
+	if ((int)danger_num < mp->mp_total_chunks - mp->mp_free_chunks) {
 		return mp->mp_total_chunks - mp->mp_free_chunks - safe_num;
 	}
 	return 0;

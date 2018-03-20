@@ -62,6 +62,10 @@ int GetOutputInterface(uint32_t daddr) {
 }
 
 extern nty_arp_table *global_arp_table;
+extern void nty_arp_request(nty_tcp_manager *tcp, uint32_t ip, int nif, uint32_t cur_ts);
+extern int nty_udp_process(nty_nic_context *ctx, unsigned char *stream);
+extern int nty_tcp_process(nty_nic_context *ctx, unsigned char *stream);
+extern int nty_icmp_process(nty_nic_context *ctx, unsigned char *stream);
 
 unsigned char *GetDestinationHWaddr(uint32_t dip) {
 	unsigned char *d_haddr = NULL;
@@ -201,7 +205,7 @@ int nty_ipv4_process(nty_nic_context *ctx, unsigned char *stream) {
 	} else if (iph->protocol == PROTO_ICMP) {
 		nty_icmp_process(ctx, stream);
 	}
-
+	return 0;
 }
 
 

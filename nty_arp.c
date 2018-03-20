@@ -47,6 +47,7 @@
 #include "nty_nic.h"
 #include "nty_arp.h"
 
+#include <pthread.h>
 
 static int nty_arp_output(nty_tcp_manager *tcp, int nif, int opcode,
 		uint32_t dst_ip, unsigned char *dst_haddr, unsigned char *target_haddr);
@@ -131,14 +132,14 @@ void nty_arp_pkt(struct arppkt *arp, struct arppkt *arp_rt, char *hmac) {
 	memcpy(arp_rt, arp, sizeof(struct arppkt));
 
 	memcpy(arp_rt->eh.h_dest, arp->eh.h_source, ETH_ALEN);
-	str2mac(arp_rt->eh.h_source, hmac);
+	str2mac((char*)arp_rt->eh.h_source, hmac);
 	arp_rt->eh.h_proto = arp->eh.h_proto;
 
 	arp_rt->arp.h_addrlen = 6;
 	arp_rt->arp.protolen = 4;
 	arp_rt->arp.oper = htons(2);
 	
-	str2mac(arp_rt->arp.smac, hmac);
+	str2mac((char*)arp_rt->arp.smac, hmac);
 	arp_rt->arp.sip = arp->arp.dip;
 	
 	memcpy(arp_rt->arp.dmac, arp->arp.smac, ETH_ALEN);
@@ -157,6 +158,8 @@ int nty_arp_process_request(struct arphdr *arph) {
 
 	nty_tcp_manager *tcp = nty_get_tcp_manager();
 	nty_arp_output(tcp, 0, arp_op_reply, arph->sip, arph->smac, NULL);
+
+	return 0;
 }
 
 int nty_arp_process_reply(struct arphdr *arph) {
@@ -254,7 +257,7 @@ static int nty_arp_output(nty_tcp_manager *tcp, int nif, int opcode,
 	arph->sip = NTY_SELF_IP_HEX;
 	arph->dip = dst_ip;
 
-	str2mac(arph->smac, NTY_SELF_MAC);
+	str2mac((char*)arph->smac, NTY_SELF_MAC);
 	if (target_haddr) {
 		memcpy(arph->dmac, target_haddr, arph->h_addrlen);
 	} else {
@@ -306,7 +309,6 @@ int nty_arp_process(nty_nic_context *ctx, unsigned char *stream) {
 	if (stream == NULL) return -1;
 
 	struct arppkt *arp = (struct arppkt*)stream;
-	struct arppkt arp_rt;
 	
 	if (arp->arp.dip == inet_addr(NTY_SELF_IP)) {
 #if 0
@@ -328,6 +330,7 @@ int nty_arp_process(nty_nic_context *ctx, unsigned char *stream) {
 #endif
 	}
 
+	return 0;
 }
 
 

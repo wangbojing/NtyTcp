@@ -49,6 +49,7 @@
 //#include "nty_tcp.h"
 #include "nty_buffer.h"
 #include "nty_header.h"
+#include "nty_socket.h"
 
 typedef enum {
 	NTY_EPOLL_CTL_ADD = 1,
@@ -84,7 +85,7 @@ typedef union _nty_epoll_data {
 
 typedef struct {
 	uint32_t events;
-	nty_epoll_data data;
+	uint64_t data;
 } nty_epoll_event;
 
 typedef struct _nty_epoll_stat {
@@ -129,6 +130,10 @@ typedef struct _nty_epoll {
 	pthread_cond_t epoll_cond;
 	pthread_mutex_t epoll_lock;
 } nty_epoll;
+
+int nty_epoll_add_event(nty_epoll *ep, int queue_type, struct _nty_socket_map *socket, uint32_t event);
+int nty_close_epoll_socket(int epid);
+
 
 #endif
 

@@ -79,13 +79,17 @@ char *close_reason_str[] = {
 //extern nty_addr_pool *global_addr_pool[ETH_NUM];
 nty_addr_pool *global_addr_pool[ETH_NUM] = {NULL};
 
+extern void RemoveFromRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern inline void RemoveFromTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern void RemoveFromTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern int GetOutputInterface(uint32_t daddr);
 
 char *TCPStateToString(nty_tcp_stream *stream) {
 	return state_str[stream->state];
 }
 
 
-inline void InitializeTCPStreamManager()
+void InitializeTCPStreamManager()
 {
 	next_seed = time(NULL);
 }
@@ -173,7 +177,7 @@ void RaiseErrorEvent(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 }
 
 
-nty_tcp_stream *CreateTcpStream(nty_tcp_manager *tcp, nty_socket_map *socket, int type, 
+nty_tcp_stream *CreateTcpStream(nty_tcp_manager *tcp, struct _nty_socket_map *socket, int type, 
 		uint32_t saddr, uint16_t sport, uint32_t daddr, uint16_t dport) {
 
 	nty_tcp_stream *stream = NULL;
@@ -368,7 +372,7 @@ void DestroyTcpStream(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 
 	pthread_mutex_lock(&tcp->ctx->flow_pool_lock);
 
-	StreamHTRemove(tcp->flow, stream);
+	StreamHTRemove(tcp->tcp_flow_table, stream);
 	stream->on_hash_table = 0;
 
 	tcp->flow_cnt --;

@@ -24,6 +24,12 @@ typedef struct _nty_arp_table {
 unsigned char *GetDestinationHWaddr(uint32_t dip);
 int GetOutputInterface(uint32_t daddr);
 
+int nty_arp_register_entry(uint32_t ip, const unsigned char *haddr);
+int nty_arp_process(nty_nic_context *ctx, unsigned char *stream);
+int nty_arp_init_table(void);
+
+int str2mac(char *mac, char *str);
+
 
 #endif
 

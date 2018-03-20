@@ -111,25 +111,10 @@ typedef struct _nty_sb_queue {
 	nty_send_buffer * volatile * _q;
 } nty_sb_queue;
 
-#if 0
-static inline index_type NextIndex(nty_sb_queue *sq, index_type i) {
-	return (i != sq->_capacity ? i + 1: 0);
-}
-
-static inline index_type PrevIndex(nty_sb_queue *sq, index_type i) {
-	return (i != 0 ? i - 1: sq->_capacity);
-}
-
-static inline void SBMemoryBarrier(nty_send_buffer * volatile buf, volatile index_type index) {
-	__asm__ volatile("" : : "m" (buf), "m" (index));
-}
-#else
-
 #define NextIndex(sq, i)	(i != sq->_capacity ? i + 1: 0)
 #define PrevIndex(sq, i)	(i != 0 ? i - 1: sq->_capacity)
 #define MemoryBarrier(buf, idx)	__asm__ volatile("" : : "m" (buf), "m" (idx))
 
-#endif
 
 
 /** rb frag queue **/
@@ -220,8 +205,16 @@ void DestroyInternalStreamQueue(nty_stream_queue_int *sq);
 nty_send_buffer *SBInit(nty_sb_manager *sbm, uint32_t init_seq);
 void SBFree(nty_sb_manager *sbm, nty_send_buffer *buf);
 size_t SBPut(nty_sb_manager *sbm, nty_send_buffer *buf, const void *data, size_t len);
+int SBEnqueue(nty_sb_queue *sq, nty_send_buffer *buf);
+size_t SBRemove(nty_sb_manager *sbm, nty_send_buffer *buf, size_t len);
 
 
+size_t RBRemove(nty_rb_manager *rbm, nty_ring_buffer* buff, size_t len, int option);
+int RBPut(nty_rb_manager *rbm, nty_ring_buffer* buff, 
+	   void* data, uint32_t len, uint32_t cur_seq);
+void RBFree(nty_rb_manager *rbm, nty_ring_buffer* buff);
+
+int StreamInternalEnqueue(nty_stream_queue_int *sq, struct _nty_tcp_stream *stream);
 struct _nty_tcp_stream *StreamInternalDequeue(nty_stream_queue_int *sq);
 
 
@@ -229,6 +222,7 @@ struct _nty_tcp_stream *StreamInternalDequeue(nty_stream_queue_int *sq);
 
 
 nty_sb_queue *CreateSBQueue(int capacity);
+int StreamQueueIsEmpty(nty_stream_queue *sq);
 
 
 nty_send_buffer *SBDequeue(nty_sb_queue *sq);
@@ -238,6 +232,9 @@ nty_ring_buffer *RBInit(nty_rb_manager *rbm, uint32_t init_seq);
 
 struct _nty_tcp_stream *StreamDequeue(nty_stream_queue *sq);
 int StreamEnqueue(nty_stream_queue *sq, struct _nty_tcp_stream *stream);
+
+void DestroyStreamQueue(nty_stream_queue *sq);
+
 
 
 #endif

@@ -11,9 +11,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 extern nty_tcp_manager *nty_get_tcp_manager(void);
 
+#if 0
 static int nty_peek_for_user(nty_tcp_stream *cur_stream, char *buf, int len) {
 	nty_tcp_recv *rcv = cur_stream->rcv;
 
@@ -26,6 +28,7 @@ static int nty_peek_for_user(nty_tcp_stream *cur_stream, char *buf, int len) {
 
 	return copylen;
 }
+#endif
 
 static int nty_copy_to_user(nty_tcp_stream *cur_stream, char *buf, int len) {
 	nty_tcp_manager *tcp = nty_get_tcp_manager();
@@ -42,7 +45,7 @@ static int nty_copy_to_user(nty_tcp_stream *cur_stream, char *buf, int len) {
 		return 0;
 	}
 	//rcv --> data increase
-	uint32_t prev_rcv_wnd = rcv->rcv_wnd;
+	//uint32_t prev_rcv_wnd = rcv->rcv_wnd;
 
 	memcpy(buf, rcv->recvbuf->head, copylen);
 
@@ -167,7 +170,7 @@ static int nty_close_listening_socket(int sockid) {
 	nty_tcp_manager *tcp = nty_get_tcp_manager();
 	if (!tcp) return -1;
 
-	nty_tcp_listener *listener = tcp->smap[sockid].listener;
+	struct _nty_tcp_listener *listener = tcp->smap[sockid].listener;
 	if (!listener) {
 		errno = EINVAL;
 		return -1;

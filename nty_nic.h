@@ -99,11 +99,16 @@ unsigned char* nty_nic_get_rbuffer(nty_nic_context *ctx, int nif, uint16_t *len)
 int nty_nic_send_pkts(nty_nic_context *ctx, int nif);
 int nty_nic_recv_pkts(nty_nic_context *ctx, int ifidx);
 
+int nty_nic_read(nty_nic_context *ctx, unsigned char **stream);
+int nty_nic_write(nty_nic_context *ctx, const void *stream, int length);
+
+
+
 int nty_nic_init(nty_thread_context *tctx, const char *ifname);
 int nty_nic_select(nty_nic_context *ctx);
 
 
-
+#if 0
 extern nty_nic_handler nty_netmap_handler;
 static nty_nic_handler *nty_current_handler = &nty_netmap_handler;
 
@@ -112,7 +117,7 @@ static nty_nic_handler *nty_current_handler = &nty_netmap_handler;
 #define NTY_NIC_WRITE(x, y, z)			nty_current_handler->write(x, y, z)
 #define NTY_NIC_READ(x, y)				nty_current_handler->read(x, y)
 #define NTY_NIC_GET_WBUFFER(x, y, z) 	nty_current_handler->get_wbuffer(x, y, z)
-
+#endif
 
 
 #endif

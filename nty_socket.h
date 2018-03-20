@@ -49,6 +49,28 @@
 #include "nty_tcp.h"
 
 
+typedef struct _nty_socket_map {
+	int id;
+	int socktype;
+	uint32_t opts;
+
+	struct sockaddr_in s_addr;
+
+	union {
+		struct _nty_tcp_stream *stream;
+		struct _nty_tcp_listener *listener;
+		struct _nty_epoll *ep;
+		//struct pipe *pp;
+	};
+
+	uint32_t epoll;
+	uint32_t events;
+	uint64_t ep_data;
+
+	TAILQ_ENTRY(_nty_socket_map) free_smap_link;
+} nty_socket_map; //__attribute__((packed)) 
+
+
 enum nty_socket_opts{
 	NTY_TCP_NONBLOCK = 0x01,
 	NTY_TCP_ADDR_BIND = 0x02,

@@ -70,11 +70,13 @@ int nty_icmp_process(nty_nic_context *ctx, unsigned char *stream) {
 	struct icmppkt *icmph = (struct icmppkt*)stream;
 
 	if (icmph->icmp.type == 0x08) {
-		struct icmppkt icmp_rt = {0};
+		struct icmppkt icmp_rt;
+		memset(&icmp_rt, 0, sizeof(struct icmppkt));
+		
 		nty_icmp_pkt(icmph, &icmp_rt);
-		NTY_NIC_WRITE(ctx, &icmp_rt, sizeof(struct icmppkt));
+		nty_nic_write(ctx, &icmp_rt, sizeof(struct icmppkt));
 	}
-	
+	return 0;
 }
 
 

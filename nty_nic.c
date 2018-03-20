@@ -73,7 +73,7 @@ int nty_nic_init(nty_thread_context *tctx, const char *ifname) {
 }
 
 
-static int nty_nic_read(nty_nic_context *ctx, unsigned char **stream) {
+int nty_nic_read(nty_nic_context *ctx, unsigned char **stream) {
 
 	if (ctx == NULL) return -1;
 
@@ -83,7 +83,7 @@ static int nty_nic_read(nty_nic_context *ctx, unsigned char **stream) {
 	return 0;
 }
 
-static int nty_nic_write(nty_nic_context *ctx, const void *stream, int length) {
+int nty_nic_write(nty_nic_context *ctx, const void *stream, int length) {
 
 	if (ctx == NULL) return -1;
 	if (stream == NULL) return -2;
@@ -138,7 +138,7 @@ int nty_nic_recv_pkts(nty_nic_context *ctx, int ifidx) {
 		for ( ;!nm_ring_empty(ring) && i != got; got ++) {
 			
 			int idx = ring->slot[ring->cur].buf_idx;
-			ctx->rcv_pktbuf[count] = NETMAP_BUF(ring, idx);
+			ctx->rcv_pktbuf[count] = (unsigned char*)NETMAP_BUF(ring, idx);
 			
 			ctx->rcv_pkt_len[count] = ring->slot[ring->cur].len;
 			ring->head = ring->cur = nm_ring_next(ring, ring->cur);

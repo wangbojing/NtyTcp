@@ -144,7 +144,7 @@ size_t SBPut(nty_sb_manager *sbm, nty_send_buffer *buf, const void *data, size_t
 	return to_put;
 }
 
-size_t SBRemove(nty_sb_manager sbm, nty_send_buffer *buf, size_t len)
+size_t SBRemove(nty_sb_manager *sbm, nty_send_buffer *buf, size_t len)
 {
 	size_t to_remove;
 
@@ -540,7 +540,7 @@ int RBPut(nty_rb_manager *rbm, nty_ring_buffer* buff,
 	}
 	
 	// if buffer is at tail, move the data to the first of head
-	if (buff->size <= (buff->head_offset + end_off)) {
+	if ((uint32_t)buff->size <= (buff->head_offset + (uint32_t)end_off)) {
 		memmove(buff->data, buff->head, buff->last_len);
 		buff->tail_offset -= buff->head_offset;
 		buff->head_offset = 0;
@@ -621,7 +621,7 @@ size_t RBRemove(nty_rb_manager *rbm, nty_ring_buffer* buff, size_t len, int opti
 {
 	/* this function should be called only in application thread */
 
-	if (buff->merged_len < len) 
+	if (buff->merged_len < (int)len) 
 		len = buff->merged_len;
 	
 	if (len == 0) 

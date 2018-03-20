@@ -44,6 +44,11 @@
 #ifndef __NTY_TIMER_H__
 #define __NTY_TIMER_H__
 
+#include "nty_tcp.h"
+#include "nty_queue.h"
+
+#include <stdint.h>
+
 #define RTO_HASH		3000
 
 typedef struct _nty_rto_hashstore {
@@ -53,6 +58,7 @@ typedef struct _nty_rto_hashstore {
 } nty_rto_hashstore;
 
 nty_rto_hashstore *InitRTOHashstore(void);
+
 
 
 #endif

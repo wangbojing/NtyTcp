@@ -53,6 +53,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pthread.h>
+
 extern nty_tcp_manager *nty_get_tcp_manager(void);
 
 char *event_str[] = {"NONE", "IN", "PRI", "OUT", "ERR", "HUP", "RDHUP"};
@@ -143,7 +145,7 @@ int nty_close_epoll_socket(int epid) {
 	return 0;
 }
 
-int nty_epoll_add_event(nty_epoll *ep, int queue_type, nty_socket_map *socket, uint32_t event) {
+int nty_epoll_add_event(nty_epoll *ep, int queue_type, struct _nty_socket_map *socket, uint32_t event) {
 	nty_event_queue *eq = NULL;
 
 	if (!ep || !socket || !event) return -1;
@@ -407,134 +409,134 @@ int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout
 		}
 		assert(0);
 	}
-	
-//wait:
-	nty_event_queue *eq = ep->usr_queue;
-	nty_event_queue *eq_shadow = ep->usr_shadow_queue;
 
-	while (eq->num_events == 0 && eq_shadow->num_events == 0 && timeout != 0) {
-		ep->stat.waits ++;
-		ep->waiting = 1;
+	int cnt = 0;
+	do {
+		nty_event_queue *eq = ep->usr_queue;
+		nty_event_queue *eq_shadow = ep->usr_shadow_queue;
 
-		if (timeout > 0) {
-			struct timespec deadline;
-			clock_gettime(CLOCK_REALTIME, &deadline);
+		while (eq->num_events == 0 && eq_shadow->num_events == 0 && timeout != 0) {
+			ep->stat.waits ++;
+			ep->waiting = 1;
 
-			if (timeout >= 1000) {
-				int sec = timeout / 1000;
-				deadline.tv_sec += sec;
-				timeout -= sec * 1000;
+			if (timeout > 0) {
+				struct timespec deadline;
+				clock_gettime(CLOCK_REALTIME, &deadline);
+
+				if (timeout >= 1000) {
+					int sec = timeout / 1000;
+					deadline.tv_sec += sec;
+					timeout -= sec * 1000;
+				}
+				deadline.tv_nsec += timeout * 1000000;
+
+				if (deadline.tv_nsec >= 1000000000) {
+					deadline.tv_sec ++;
+					deadline.tv_nsec -= 1000000000;
+				}
+
+				int ret = pthread_cond_timedwait(&ep->epoll_cond, &ep->epoll_lock, &deadline);
+				if (ret && ret != ETIMEDOUT) {
+					pthread_mutex_unlock(&ep->epoll_lock);
+					printf("pthread_cond_timedwait failed. ret: %d, error: %s\n", 
+							ret, strerror(errno));
+					return -1;
+				}
+				timeout = 0;
+			} else if (timeout < 0) {
+				int ret = pthread_cond_wait(&ep->epoll_cond, &ep->epoll_lock);
+				if (ret) {
+					pthread_mutex_unlock(&ep->epoll_lock);
+					printf("pthread_cond_wait failed. ret: %d, error: %s\n", 
+							ret, strerror(errno));
+					return -1;
+				}
 			}
-			deadline.tv_nsec += timeout * 1000000;
 
-			if (deadline.tv_nsec >= 1000000000) {
-				deadline.tv_sec ++;
-				deadline.tv_nsec -= 1000000000;
-			}
-
-			int ret = pthread_cond_timedwait(&ep->epoll_cond, &ep->epoll_lock, &deadline);
-			if (ret && ret != ETIMEDOUT) {
+			ep->waiting = 0;
+			if (tcp->ctx->done || tcp->ctx->exit || tcp->ctx->interrupt) {
+				tcp->ctx->interrupt = 0;
 				pthread_mutex_unlock(&ep->epoll_lock);
-				printf("pthread_cond_timedwait failed. ret: %d, error: %s\n", 
-						ret, strerror(errno));
+				errno = EINTR;
 				return -1;
 			}
-			timeout = 0;
-		} else if (timeout < 0) {
-			int ret = pthread_cond_wait(&ep->epoll_cond, &ep->epoll_lock);
-			if (ret) {
-				pthread_mutex_unlock(&ep->epoll_lock);
-				printf("pthread_cond_wait failed. ret: %d, error: %s\n", 
-						ret, strerror(errno));
-				return -1;
+		}
+
+		int i, validity;
+		int num_events = eq->num_events;
+		for (i = 0;i < num_events && cnt < maxevents;i ++) {
+			nty_socket_map *event_socket = &tcp->smap[eq->events[eq->start].sockid];
+			validity = 1;
+			if (event_socket->socktype == NTY_TCP_SOCK_UNUSED) 
+				validity = 0;
+			if (!(event_socket->epoll & eq->events[eq->start].ev.events)) 
+				validity = 0;
+			if (!(event_socket->events & eq->events[eq->start].ev.events)) 
+				validity = 0;
+
+			if (validity) {
+				events[cnt++] = eq->events[eq->start].ev;
+				assert(eq->events[eq->start].sockid >= 0);
+
+				printf("Socket %d: Handled event. event: %s, "
+						"start: %u, end: %u, num: %u\n", 
+						event_socket->id, 
+						EventToString(eq->events[eq->start].ev.events), 
+						eq->start, eq->end, eq->num_events);
+
+				ep->stat.handled ++;
+			} else {
+				printf("Socket %d: event %s invalidated.\n", 
+						eq->events[eq->start].sockid, 
+						EventToString(eq->events[eq->start].ev.events));
+				ep->stat.invalidated ++;
+			}
+			event_socket->events &= (~eq->events[eq->start].ev.events);
+
+			eq->start ++;
+			eq->num_events --;
+			if (eq->start >= eq->size) eq->start = 0;
+		}
+
+		
+		eq = ep->usr_shadow_queue;
+		num_events = eq->num_events;
+		for (i = 0; i < num_events && cnt < maxevents; i++) {
+			nty_socket_map *event_socket = &tcp->smap[eq->events[eq->start].sockid];
+			validity = 1;
+			if (event_socket->socktype == NTY_TCP_SOCK_UNUSED)
+				validity = 0;
+			if (!(event_socket->epoll & eq->events[eq->start].ev.events))
+				validity = 0;
+			if (!(event_socket->events & eq->events[eq->start].ev.events))
+				validity = 0;
+
+			if (validity) {
+				events[cnt++] = eq->events[eq->start].ev;
+				assert(eq->events[eq->start].sockid >= 0);
+
+				printf("Socket %d: Handled event. event: %s, "
+						"start: %u, end: %u, num: %u\n", 
+						event_socket->id, 
+						EventToString(eq->events[eq->start].ev.events), 
+						eq->start, eq->end, eq->num_events);
+				ep->stat.handled++;
+			} else {
+				printf("Socket %d: event %s invalidated.\n", 
+						eq->events[eq->start].sockid, 
+						EventToString(eq->events[eq->start].ev.events));
+				ep->stat.invalidated++;
+			}
+			event_socket->events &= (~eq->events[eq->start].ev.events);
+
+			eq->start++;
+			eq->num_events--;
+			if (eq->start >= eq->size) {
+				eq->start = 0;
 			}
 		}
 
-		ep->waiting = 0;
-		if (tcp->ctx->done || tcp->ctx->exit || tcp->ctx->interrupt) {
-			tcp->ctx->interrupt = 0;
-			pthread_mutex_unlock(&ep->epoll_lock);
-			errno = EINTR;
-			return -1;
-		}
-	}
-
-	int cnt = 0, i, validity;
-	int num_events = eq->num_events;
-	for (i = 0;i < num_events && cnt < maxevents;i ++) {
-		nty_socket_map *event_socket = &tcp->smap[eq->events[eq->start].sockid];
-		validity = 1;
-		if (event_socket->socktype == NTY_TCP_SOCK_UNUSED) 
-			validity = 0;
-		if (!(event_socket->epoll & eq->events[eq->start].ev.events)) 
-			validity = 0;
-		if (!(event_socket->events & eq->events[eq->start].ev.events)) 
-			validity = 0;
-
-		if (validity) {
-			events[cnt++] = eq->events[eq->start].ev;
-			assert(eq->events[eq->start].sockid >= 0);
-
-			printf("Socket %d: Handled event. event: %s, "
-					"start: %u, end: %u, num: %u\n", 
-					event_socket->id, 
-					EventToString(eq->events[eq->start].ev.events), 
-					eq->start, eq->end, eq->num_events);
-
-			ep->stat.handled ++;
-		} else {
-			printf("Socket %d: event %s invalidated.\n", 
-					eq->events[eq->start].sockid, 
-					EventToString(eq->events[eq->start].ev.events));
-			ep->stat.invalidated ++;
-		}
-		event_socket->events &= (~eq->events[eq->start].ev.events);
-
-		eq->start ++;
-		eq->num_events --;
-		if (eq->start >= eq->size) eq->start = 0;
-	}
-
-	
-	eq = ep->usr_shadow_queue;
-	num_events = eq->num_events;
-	for (i = 0; i < num_events && cnt < maxevents; i++) {
-		nty_socket_map *event_socket = &tcp->smap[eq->events[eq->start].sockid];
-		validity = 1;
-		if (event_socket->socktype == NTY_TCP_SOCK_UNUSED)
-			validity = 0;
-		if (!(event_socket->epoll & eq->events[eq->start].ev.events))
-			validity = 0;
-		if (!(event_socket->events & eq->events[eq->start].ev.events))
-			validity = 0;
-
-		if (validity) {
-			events[cnt++] = eq->events[eq->start].ev;
-			assert(eq->events[eq->start].sockid >= 0);
-
-			printf("Socket %d: Handled event. event: %s, "
-					"start: %u, end: %u, num: %u\n", 
-					event_socket->id, 
-					EventToString(eq->events[eq->start].ev.events), 
-					eq->start, eq->end, eq->num_events);
-			ep->stat.handled++;
-		} else {
-			printf("Socket %d: event %s invalidated.\n", 
-					eq->events[eq->start].sockid, 
-					EventToString(eq->events[eq->start].ev.events));
-			ep->stat.invalidated++;
-		}
-		event_socket->events &= (~eq->events[eq->start].ev.events);
-
-		eq->start++;
-		eq->num_events--;
-		if (eq->start >= eq->size) {
-			eq->start = 0;
-		}
-	}
-
-	if (cnt == 0 && timeout != 0)
-		;//goto wait;
+	}while (cnt == 0 && timeout != 0);
 
 	pthread_mutex_unlock(&ep->epoll_lock);
 
@@ -574,6 +576,8 @@ int nty_flush_epoll_events(uint32_t cur_ts) {
 	}
 
 	pthread_mutex_unlock(&ep->epoll_lock);
+
+	return 0;
 }
 
 

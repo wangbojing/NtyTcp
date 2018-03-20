@@ -49,7 +49,7 @@
 #include <stdint.h>
 
 #include "nty_queue.h"
-#include "nty_tcp.h"
+//#include "nty_tcp.h"
 
 
 #define NUM_BINS_FLOWS		131072
@@ -95,6 +95,10 @@ typedef struct _nty_hashtable {
 
 void *ListenerHTSearch(nty_hashtable *ht, const void *it);
 void *StreamHTSearch(nty_hashtable *ht, const void *it);
+int ListenerHTInsert(nty_hashtable *ht, void *it);
+int StreamHTInsert(nty_hashtable *ht, void *it);
+void *StreamHTRemove(nty_hashtable *ht, void *it);
+
 
 unsigned int HashFlow(const void *f);
 int EqualFlow(const void *f1, const void *f2);

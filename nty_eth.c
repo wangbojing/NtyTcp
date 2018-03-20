@@ -45,6 +45,8 @@
 #include "nty_nic.h"
 #include "nty_arp.h"
 
+#include <pthread.h>
+
 //gcc -o nty_stack *.o -lpthread -lhugetlbfs
 
 unsigned short in_cksum(unsigned short *addr, int len) {
@@ -77,13 +79,13 @@ uint8_t *EthernetOutput(nty_tcp_manager *tcp, uint16_t h_proto,
 
 	nty_thread_context *ctx = tcp->ctx;
 
-	uint8_t *buf = NTY_NIC_GET_WBUFFER(ctx->io_private_context, 0, iplen+ETHERNET_HEADER_LEN);
+	uint8_t *buf = (uint8_t*)nty_nic_get_wbuffer(ctx->io_private_context, 0, iplen+ETHERNET_HEADER_LEN);
 	if (buf == NULL) return NULL;
 
 	struct ethhdr *ethh = (struct ethhdr*)buf;
 	int i = 0;
 
-	str2mac(ethh->h_source, NTY_SELF_MAC);
+	str2mac((char*)ethh->h_source, NTY_SELF_MAC);
 	for (i = 0;i < ETH_ALEN;i ++) {
 		ethh->h_dest[i] = dst_haddr[i];
 	}
@@ -104,6 +106,7 @@ static int nty_eth_process(nty_nic_context *ctx, unsigned char *stream) {
 		nty_arp_process(ctx, stream);
 	}
 
+	return 0;
 }
 
 #if 0
@@ -143,17 +146,19 @@ int main () {
 #else
 
 extern nty_tcp_manager *nty_get_tcp_manager(void);
+extern void CheckRtmTimeout(nty_tcp_manager *tcp, uint32_t cur_ts, int thresh);
+extern void CheckTimewaitExpire(nty_tcp_manager *tcp, uint32_t cur_ts, int thresh);
+extern void CheckConnectionTimeout(nty_tcp_manager *tcp, uint32_t cur_ts, int thresh);
+
+
 
 static void *nty_tcp_run(void *arg) {
 	nty_nic_context *ctx = (nty_nic_context *)arg;
 
 	nty_tcp_manager *tcp = nty_get_tcp_manager();
 
-
-	int debug = 0, i;
-
 	while (1) {
-#if 1
+
 		struct pollfd pfd = {0};
 		pfd.fd = ctx->nmr->fd;
 		pfd.events = POLLIN | POLLOUT;
@@ -166,8 +171,7 @@ static void *nty_tcp_run(void *arg) {
 		if (pfd.revents & POLLIN) {
 
 			unsigned char *stream = NULL;
-			uint16_t len = 0;
-			NTY_NIC_READ(ctx, &stream);
+			nty_nic_read(ctx, &stream);
 
 			nty_eth_process(ctx, stream);
 
@@ -175,7 +179,6 @@ static void *nty_tcp_run(void *arg) {
 			gettimeofday(&cur_ts, NULL);
 			uint32_t ts = TIMEVAL_TO_TS(&cur_ts);
 
-			//nty_trace_eth("flow cnt : %d\n", tcp->flow_cnt);
 			if (tcp->flow_cnt > 0) {
 				CheckRtmTimeout(tcp, ts, NTY_MAX_CONCURRENCY);
 				CheckTimewaitExpire(tcp, ts, NTY_MAX_CONCURRENCY);
@@ -192,46 +195,7 @@ static void *nty_tcp_run(void *arg) {
 			nty_nic_send_pkts(ctx, 0);
 			//NTY_NIC_WRITE(ctx, ctx->snd_pktbuf,ctx->snd_pkt_size);
 		} 
-		
-#else
-		int ret = nty_nic_select(ctx);
-
-		if (ret > 0) {
-			unsigned char *stream = NULL;
-			uint16_t len = 0;
-			//NTY_NIC_READ(ctx, &stream);
-			int recv_cnt = nty_nic_recv_pkts(ctx, 0);
-			//printf("nty_nic_recv_pkts --> recv_cnt : %d, %x, %x\n", recv_cnt, POLLERR, POLLIN);
-
-			for (i = 0;i < recv_cnt;i ++) {
-				stream = NULL;
-				len = 0;
 				
-				stream = nty_nic_get_rbuffer(ctx, 0, &len);	
-				if (stream && len)
-					nty_eth_process(ctx, stream);
-			}
-
-			struct timeval cur_ts = {0};
-			gettimeofday(&cur_ts, NULL);
-			uint32_t ts = TIMEVAL_TO_TS(&cur_ts);
-			
-			if (tcp->flow_cnt > 0) {
-				CheckRtmTimeout(tcp, ts, NTY_MAX_CONCURRENCY);
-				CheckTimewaitExpire(tcp, ts, NTY_MAX_CONCURRENCY);
-				CheckConnectionTimeout(tcp, ts, NTY_MAX_CONCURRENCY);
-				
-				nty_tcp_handle_apicall(ts);
-			}
-
-			nty_tcp_write_chunks(ts);
-
-			nty_nic_send_pkts(ctx, 0);
-		}
-
-#endif
-
-		
 	}
 
 	return NULL;

@@ -47,6 +47,9 @@
 #include "nty_timer.h"
 #include "nty_tcp.h"
 
+
+extern void DestroyTcpStream(nty_tcp_manager *tcp, nty_tcp_stream *stream);
+
 nty_rto_hashstore *InitRTOHashstore(void) {
 
 	nty_rto_hashstore *hs = calloc(1, sizeof(nty_rto_hashstore));
@@ -62,7 +65,7 @@ nty_rto_hashstore *InitRTOHashstore(void) {
 }
 
 
-inline void AddtoRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void AddtoRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 
 	if (!tcp->rto_list_cnt) {
 		tcp->rto_store->rto_now_idx = 0;
@@ -93,7 +96,7 @@ inline void AddtoRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 }
 
 
-inline void RemoveFromRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void RemoveFromRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	if (cur_stream->on_rto_idx < 0) return ;
 
 	TAILQ_REMOVE(&(tcp->rto_store->rto_list[cur_stream->on_rto_idx]),
@@ -103,7 +106,7 @@ inline void RemoveFromRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) 
 	tcp->rto_list_cnt --;
 }
 
-inline void AddtoTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, uint32_t cur_ts)
+void AddtoTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, uint32_t cur_ts)
 {
 	cur_stream->rcv->ts_tw_expire = cur_ts + NTY_TCP_TIMEWAIT;
 
@@ -125,7 +128,7 @@ inline void AddtoTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, 
 	}
 }
 
-inline void RemoveFromTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void RemoveFromTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	if (!cur_stream->on_timewait_list) {
 		assert(0);
 		return;
@@ -136,7 +139,7 @@ inline void RemoveFromTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_str
 	tcp->timewait_list_cnt--;
 }
 
-inline void AddtoTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream)
+void AddtoTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream)
 {
 	if (cur_stream->on_timeout_list) {
 		assert(0);
@@ -148,7 +151,7 @@ inline void AddtoTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream)
 	tcp->timeout_list_cnt++;
 }
 
-inline void RemoveFromTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream)
+void RemoveFromTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream)
 {
 	if (cur_stream->on_timeout_list) {
 		cur_stream->on_timeout_list = 0;
@@ -157,7 +160,7 @@ inline void RemoveFromTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stre
 	}
 }
 
-inline void UpdateTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream)
+void UpdateTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream)
 {
 	if (cur_stream->on_timeout_list) {
 		TAILQ_REMOVE(&tcp->timeout_list, cur_stream, snd->timeout_link);
@@ -165,7 +168,7 @@ inline void UpdateTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream)
 	}
 }
 
-inline void UpdateRetransmissionTimer(nty_tcp_manager *tcp, 
+void UpdateRetransmissionTimer(nty_tcp_manager *tcp, 
 		nty_tcp_stream *cur_stream, uint32_t cur_ts)
 {
 	assert(cur_stream->snd->rto > 0);
@@ -322,6 +325,8 @@ int HandleRTO(nty_tcp_manager *tcp, uint32_t cur_ts, nty_tcp_stream *cur_stream)
 	} else {
 		nty_tcp_addto_controllist(tcp, cur_stream);
 	}
+
+	return 0;
 }
 
 

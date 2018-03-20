@@ -48,6 +48,8 @@
 #include "nty_buffer.h"
 #include "nty_timer.h"
 
+#include <pthread.h>
+
 nty_tcp_manager *nty_tcp = NULL;
 #if 0
 static inline int nty_tcp_stream_cmp(nty_tcp_stream *ts1, nty_tcp_stream *ts2) {
@@ -90,6 +92,19 @@ static void nty_tcp_process_ack(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream
 static int nty_tcp_process_rst(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, uint32_t ack_seq);
 
 extern unsigned short in_cksum(unsigned short *addr, int len);
+
+extern void UpdateTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern void AddtoRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern void UpdateRetransmissionTimer(nty_tcp_manager *tcp, 
+		nty_tcp_stream *cur_stream, uint32_t cur_ts);
+extern void AddtoTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, uint32_t cur_ts);
+extern void DestroyTcpStream(nty_tcp_manager *tcp, nty_tcp_stream *stream);
+extern void RemoveFromRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern void AddtoTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern void RemoveFromTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern void InitializeTCPStreamManager();
+extern void RemoveFromTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+
 
 nty_tcp_manager *nty_get_tcp_manager(void) {
 	return nty_tcp;
@@ -247,7 +262,7 @@ inline void nty_tcp_addto_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stre
 	}
 }
 
-inline void nty_tcp_addto_controllist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void nty_tcp_addto_controllist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	nty_sender *sender = nty_tcp_getsender(tcp, cur_stream);
 	assert(sender != NULL);
 
@@ -258,7 +273,7 @@ inline void nty_tcp_addto_controllist(nty_tcp_manager *tcp, nty_tcp_stream *cur_
 	}
 }
 
-inline void nty_tcp_addto_sendlist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void nty_tcp_addto_sendlist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	nty_sender *sender = nty_tcp_getsender(tcp, cur_stream);
 	assert(sender != NULL);
 
@@ -275,7 +290,7 @@ inline void nty_tcp_addto_sendlist(nty_tcp_manager *tcp, nty_tcp_stream *cur_str
 	}
 }
 
-inline void nty_tcp_remove_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void nty_tcp_remove_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	nty_sender *sender = nty_tcp_getsender(tcp, cur_stream);
 
 	if (cur_stream->snd->on_ack_list) {
@@ -286,7 +301,7 @@ inline void nty_tcp_remove_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_str
 }
 
 
-inline void nty_tcp_remove_controllist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void nty_tcp_remove_controllist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	nty_sender *sender = nty_tcp_getsender(tcp, cur_stream);
 
 	if (cur_stream->snd->on_control_list) {
@@ -296,7 +311,7 @@ inline void nty_tcp_remove_controllist(nty_tcp_manager *tcp, nty_tcp_stream *cur
 	}
 }
 
-inline void nty_tcp_remove_sendlist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void nty_tcp_remove_sendlist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	nty_sender *sender = nty_tcp_getsender(tcp, cur_stream);
 
 	if (cur_stream->snd->on_send_list) {
@@ -320,7 +335,7 @@ void nty_tcp_parse_options(nty_tcp_stream *cur_stream, uint32_t cur_ts, uint8_t 
 			continue;
 		} else {
 			optlen = *(tcpopt + i++);
-			if (i + optlen - 2 > len) break;
+			if (i + optlen - 2 > (unsigned int)len) break;
 
 			if (opt == TCP_OPT_MSS) {
 				cur_stream->snd->mss = *(tcpopt + i++) << 8;
@@ -387,7 +402,7 @@ inline int nty_tcp_parse_timestamp(nty_tcp_timestamp *ts, uint8_t *tcpopt, int l
 			continue;
 		} else {
 			optlen = *(tcpopt + i++);
-			if (i + optlen - 2 > len) {
+			if (i + optlen - 2 > (unsigned int)len) {
 				break;
 			}
 			if (opt == TCP_OPT_TIMESTAMP) {
@@ -779,8 +794,6 @@ static void nty_tcp_flush_send_event(nty_tcp_send *snd) {
 	
 	pthread_mutex_unlock(&snd->write_lock);
 }
-
-
 
 static void nty_tcp_handle_listen(nty_tcp_manager *tcp, uint32_t cur_ts,
 	nty_tcp_stream *cur_stream, struct tcphdr *tcph) {
@@ -1467,6 +1480,8 @@ static void nty_tcp_process_ack(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream
 			assert(0);
 		}
 		int ret = SBRemove(tcp->rbm_snd, snd->sndbuf, rmlen);
+		if (ret <= 0) return ;
+		
 		snd->snd_una = ack_seq;
 		uint32_t snd_wnd_prev = snd->snd_wnd;
 		snd->snd_wnd = snd->sndbuf->size - snd->sndbuf->len;
@@ -1786,7 +1801,8 @@ int nty_tcp_init_manager(nty_thread_context *ctx) {
 #endif
 
 	nty_tcp = tcp;
-	
+
+	return 0;
 }
 
 void nty_tcp_init_thread_context(nty_thread_context *ctx) {

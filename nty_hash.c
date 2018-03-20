@@ -43,6 +43,7 @@
 
 
 #include "nty_hash.h"
+#include "nty_tcp.h"
 
 unsigned int HashFlow(const void *f) {
 	nty_tcp_stream *flow = (nty_tcp_stream*)f;
@@ -148,8 +149,7 @@ int StreamHTInsert(nty_hashtable *ht, void *it)
 	nty_tcp_stream *item = (nty_tcp_stream*)it;
 
 	assert(ht);
-	assert(ht->ht_count <= 65535); // uint16_t ht_count 
-
+	
 	idx = ht->hashfn(item);
 	assert(idx >=0 && idx < NUM_BINS_FLOWS);
 
@@ -199,8 +199,7 @@ int ListenerHTInsert(nty_hashtable *ht, void *it)
 	struct _nty_tcp_listener *item = (struct _nty_tcp_listener *)it;
 
 	assert(ht);
-	assert(ht->ht_count <= 65535); // uint16_t ht_count 
-
+	
 	idx = ht->hashfn(item);
 	assert(idx >=0 && idx < NUM_BINS_LISTENERS);
 

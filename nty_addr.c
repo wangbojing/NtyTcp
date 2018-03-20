@@ -1,4 +1,3 @@
-
 /*
  *  Author : WangBoJing , email : 1989wangbojing@gmail.com
  * 
@@ -44,6 +43,8 @@
  
 
 #include "nty_addr.h"
+
+#include <pthread.h>
 
 nty_addr_pool *CreateAddressPool(in_addr_t addr_base, int num_addr)
 {

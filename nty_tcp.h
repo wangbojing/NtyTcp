@@ -44,10 +44,11 @@
 #ifndef __NTY_TCP_H__
 #define __NTY_TCP_H__
 
+#include "nty_timer.h"
+
 #include "nty_buffer.h"
 #include "nty_hash.h"
 #include "nty_addr.h"
-#include "nty_timer.h"
 
 #include "nty_epoll.h"
 
@@ -432,39 +433,27 @@ typedef struct _nty_tcp_listener {
 	TAILQ_ENTRY(_nty_tcp_listener) he_link;
 } nty_tcp_listener; //__attribute__((packed)) 
 
-typedef struct _nty_socket_map {
-	int id;
-	int socktype;
-	uint32_t opts;
-
-	struct sockaddr_in s_addr;
-
-	union {
-		struct _nty_tcp_stream *stream;
-		nty_tcp_listener *listener;
-		nty_epoll *ep;
-		//struct pipe *pp;
-	};
-
-	uint32_t epoll;
-	uint32_t events;
-	nty_epoll_data ep_data;
-
-	TAILQ_ENTRY(_nty_socket_map) free_smap_link;
-} nty_socket_map; //__attribute__((packed)) 
 
 uint8_t *EthernetOutput(nty_tcp_manager *tcp, uint16_t h_proto,
 	int nif, unsigned char* dst_haddr, uint16_t iplen);
 uint8_t *IPOutput(nty_tcp_manager *tcp, nty_tcp_stream *stream, uint16_t tcplen);
 
 
-nty_tcp_stream *CreateTcpStream(nty_tcp_manager *tcp, nty_socket_map *socket, int type, 
+nty_tcp_stream *CreateTcpStream(nty_tcp_manager *tcp, struct _nty_socket_map *socket, int type, 
 		uint32_t saddr, uint16_t sport, uint32_t daddr, uint16_t dport);
 
 uint8_t *IPOutputStandalone(nty_tcp_manager *tcp, uint8_t protocol, 
 		uint16_t ip_id, uint32_t saddr, uint32_t daddr, uint16_t payloadlen);
 
+void nty_tcp_addto_sendlist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+void nty_tcp_addto_controllist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+void nty_tcp_remove_controllist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+void nty_tcp_remove_sendlist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+void nty_tcp_remove_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
 
+
+void nty_tcp_write_chunks(uint32_t cur_ts);
+int nty_tcp_handle_apicall(uint32_t cur_ts);
 int nty_tcp_init_manager(nty_thread_context *ctx);
 void nty_tcp_init_thread_context(nty_thread_context *ctx);
 

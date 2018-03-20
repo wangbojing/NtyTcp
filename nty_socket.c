@@ -40,8 +40,8 @@
  *
  */
 	 
+#include "nty_epoll.h"
 #include "nty_header.h"
-
 #include "nty_socket.h"
 
 #include <pthread.h>

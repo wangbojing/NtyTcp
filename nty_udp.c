@@ -64,8 +64,8 @@ int nty_udp_process(nty_nic_context *ctx, unsigned char *stream) {
 
 	struct udppkt *udph = (struct udppkt *)stream;
 
-	struct in_addr addr;
-	addr.s_addr = udph->ip.saddr;
+	//struct in_addr addr;
+	//addr.s_addr = udph->ip.saddr;
 
 	int udp_length = ntohs(udph->udp.len);
 	udph->body[udp_length-8] = '\0';
@@ -75,6 +75,8 @@ int nty_udp_process(nty_nic_context *ctx, unsigned char *stream) {
 
 	struct udppkt udph_rt;
 	nty_udp_pkt(udph, &udph_rt);
-	NTY_NIC_WRITE(ctx, &udph_rt, sizeof(struct udppkt));
+	nty_nic_write(ctx, &udph_rt, sizeof(struct udppkt));
+
+	return 0;
 }
 
