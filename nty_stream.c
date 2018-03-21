@@ -80,7 +80,7 @@ char *close_reason_str[] = {
 nty_addr_pool *global_addr_pool[ETH_NUM] = {NULL};
 
 extern void RemoveFromRTOList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
-extern inline void RemoveFromTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern void RemoveFromTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
 extern void RemoveFromTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
 extern int GetOutputInterface(uint32_t daddr);
 

@@ -104,6 +104,10 @@ extern void AddtoTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
 extern void RemoveFromTimewaitList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
 extern void InitializeTCPStreamManager();
 extern void RemoveFromTimeoutList(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern void nty_tcp_enqueue_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, uint32_t cur_ts, uint8_t opt) ;
+extern void nty_tcp_addto_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream);
+extern int nty_tcp_parse_timestamp(nty_tcp_timestamp *ts, uint8_t *tcpopt, int len);
+
 
 
 nty_tcp_manager *nty_get_tcp_manager(void) {
@@ -251,7 +255,7 @@ nty_sender *nty_tcp_getsender(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) 
 #endif
 }
 
-inline void nty_tcp_addto_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
+void nty_tcp_addto_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream) {
 	nty_sender *sender = nty_tcp_getsender(tcp, cur_stream);
 	assert(sender != NULL);
 
@@ -364,7 +368,7 @@ void nty_tcp_parse_options(nty_tcp_stream *cur_stream, uint32_t cur_ts, uint8_t 
 	
 }
 
-inline void nty_tcp_enqueue_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, uint32_t cur_ts, uint8_t opt) {
+void nty_tcp_enqueue_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_stream, uint32_t cur_ts, uint8_t opt) {
 	if (!(cur_stream->state == NTY_TCP_ESTABLISHED || 
 			cur_stream->state == NTY_TCP_CLOSE_WAIT ||
 			cur_stream->state == NTY_TCP_FIN_WAIT_1 ||
@@ -389,7 +393,7 @@ inline void nty_tcp_enqueue_acklist(nty_tcp_manager *tcp, nty_tcp_stream *cur_st
 } 
 
 
-inline int nty_tcp_parse_timestamp(nty_tcp_timestamp *ts, uint8_t *tcpopt, int len) {
+int nty_tcp_parse_timestamp(nty_tcp_timestamp *ts, uint8_t *tcpopt, int len) {
 
 	int i;
 	unsigned int opt, optlen;
