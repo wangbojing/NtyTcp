@@ -19,6 +19,8 @@ int nty_close(int sockid);
 void nty_tcp_setup(void);
 
 
+
+
 #endif
 
 

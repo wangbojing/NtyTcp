@@ -42,7 +42,7 @@
 
 
 
-#include "nty_epoll.h"
+#include "nty_epoll_inner.h"
 #include "nty_socket.h"
 
 #include <unistd.h>

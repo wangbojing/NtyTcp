@@ -39,98 +39,67 @@
 
  *
  */
-	 
-#include "nty_epoll_inner.h"
+
+
+#ifndef __NTY_EPOLL_INNER_H__
+#define __NTY_EPOLL_INNER_H__
+
+
+#include "nty_epoll.h"
+#include "nty_buffer.h"
 #include "nty_header.h"
 #include "nty_socket.h"
 
-#include <pthread.h>
-#include <errno.h>
 
-extern nty_tcp_manager *nty_get_tcp_manager(void);
+typedef struct _nty_epoll_stat {
+	uint64_t calls;
+	uint64_t waits;
+	uint64_t wakes;
 
+	uint64_t issued;
+	uint64_t registered;
+	uint64_t invalidated;
+	uint64_t handled;
+} nty_epoll_stat;
 
-nty_socket_map *nty_allocate_socket(int socktype, int need_lock) {
-	nty_tcp_manager *tcp = nty_get_tcp_manager();
-	if (tcp == NULL) {
-		assert(0);
-		return NULL;
-	}
+typedef struct _nty_epoll_event_int {
+	nty_epoll_event ev;
+	int sockid;
+} nty_epoll_event_int;
 
-	if (need_lock) {
-		pthread_mutex_lock(&tcp->ctx->smap_lock);
-	}
-
-	nty_socket_map *socket = NULL;
-	while (socket == NULL) {
-		socket = TAILQ_FIRST(&tcp->free_smap);
-		if (!socket) {
-			if (need_lock) {
-				pthread_mutex_unlock(&tcp->ctx->smap_lock);
-			}
-			printf("The concurrent sockets are at maximum.\n");
-			return NULL;
-		}
-		TAILQ_REMOVE(&tcp->free_smap, socket, free_smap_link);
-
-		if (socket->events) {
-			printf("There are still not invalidate events remaining.\n");
-			TAILQ_INSERT_TAIL(&tcp->free_smap, socket, free_smap_link);
-			socket = NULL;
-		}
-	}
-
-	if (need_lock) {
-		pthread_mutex_unlock(&tcp->ctx->smap_lock);
-	}
-	socket->socktype = socktype;
-	socket->opts = 0;
-	socket->stream = NULL;
-	socket->epoll = 0;
-	socket->events = 0;
-
-	memset(&socket->s_addr, 0, sizeof(struct sockaddr_in));
-	memset(&socket->ep_data, 0, sizeof(nty_epoll_data));
-
-	return socket;
-	
-}
+typedef enum {
+	USR_EVENT_QUEUE = 0,
+	USR_SHADOW_EVENT_QUEUE = 1,
+	NTY_EVENT_QUEUE = 2
+} nty_event_queue_type;
 
 
-void nty_free_socket(int sockid, int need_lock) {
+typedef struct _nty_event_queue {
+	nty_epoll_event_int *events;
+	int start;
+	int end;
+	int size;
+	int num_events;
+} nty_event_queue;
 
-	nty_tcp_manager *tcp = nty_get_tcp_manager();
-	nty_socket_map *socket = &tcp->smap[sockid];
+typedef struct _nty_epoll {
+	nty_event_queue *usr_queue;
+	nty_event_queue *usr_shadow_queue;
+	nty_event_queue *queue;
 
-	if (socket->socktype == NTY_TCP_SOCK_UNUSED) {
-		return ;
-	}
-	socket->socktype = NTY_TCP_SOCK_UNUSED;
-	socket->socktype = NTY_EPOLLNONE;
-	socket->events = 0;
+	uint8_t waiting;
+	nty_epoll_stat stat;
 
-	if (need_lock) {
-		pthread_mutex_lock(&tcp->ctx->smap_lock);
-	}
-	tcp->smap[sockid].stream = NULL;
-	TAILQ_INSERT_TAIL(&tcp->free_smap, socket, free_smap_link);
+	pthread_cond_t epoll_cond;
+	pthread_mutex_t epoll_lock;
+} nty_epoll;
 
-	if (need_lock) {
-		pthread_mutex_unlock(&tcp->ctx->smap_lock);
-	}
-}
+int nty_epoll_add_event(nty_epoll *ep, int queue_type, struct _nty_socket_map *socket, uint32_t event);
+int nty_close_epoll_socket(int epid);
 
 
-nty_socket_map *nty_get_socket(int sockid) {
-#if 1	
-	if (sockid < 0 || sockid >= NTY_MAX_CONCURRENCY) {
-		errno = EBADF;
-		return NULL;
-	}
+
 #endif
-	nty_tcp_manager *tcp = nty_get_tcp_manager();
-	nty_socket_map *socket = &tcp->smap[sockid];
 
-	return socket;
-}                     
+
 

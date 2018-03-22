@@ -1,11 +1,18 @@
 
-SERVER_EXAMPLE_OBJ = $(BIN_DIR)/nty_example_tcp_server.o
+BLOCK_SERVER_OBJ = $(BIN_DIR)/nty_example_tcp_server.o
+EPOLL_SERVER_OBJ = $(BIN_DIR)/nty_example_epoll_server.o
 
-SERVER_EXAMPLE_BIN = nty_server_example
+BLOCK_SERVER = nty_example_block_server
+EPOLL_SERVER = nty_example_epoll_server
 
-all : $(SERVER_EXAMPLE_BIN)
+all : $(BLOCK_SERVER) $(EPOLL_SERVER)
 
-$(SERVER_EXAMPLE_BIN) : $(SERVER_EXAMPLE_OBJ)
-	$(CC) -o $(BIN_DIR)/$(SERVER_EXAMPLE_BIN) $(OBJS_DIR)/* $(SERVER_EXAMPLE_OBJ) $(FLAG)
+$(BLOCK_SERVER) : $(BLOCK_SERVER_OBJ)
+	$(CC) -o $(BIN_DIR)/$(BLOCK_SERVER) $(OBJS_DIR)/* $(BLOCK_SERVER_OBJ) $(FLAG)
+
+$(EPOLL_SERVER) : $(EPOLL_SERVER_OBJ)
+	$(CC) -o $(BIN_DIR)/$(EPOLL_SERVER) $(OBJS_DIR)/* $(EPOLL_SERVER_OBJ) $(FLAG)
+
+
 
 

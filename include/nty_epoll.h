@@ -46,16 +46,7 @@
 #ifndef __NTY_EPOLL_H__
 #define __NTY_EPOLL_H__
 
-//#include "nty_tcp.h"
-#include "nty_buffer.h"
-#include "nty_header.h"
-#include "nty_socket.h"
-
-typedef enum {
-	NTY_EPOLL_CTL_ADD = 1,
-	NTY_EPOLL_CTL_DEL = 2,
-	NTY_EPOLL_CTL_MOD = 3,
-} nty_epoll_op; 
+#include <stdint.h>
 
 typedef enum {
 
@@ -76,6 +67,14 @@ typedef enum {
 
 } nty_epoll_type;
 
+
+typedef enum {
+	NTY_EPOLL_CTL_ADD = 1,
+	NTY_EPOLL_CTL_DEL = 2,
+	NTY_EPOLL_CTL_MOD = 3,
+} nty_epoll_op; 
+
+
 typedef union _nty_epoll_data {
 	void *ptr;
 	int sockid;
@@ -88,51 +87,14 @@ typedef struct {
 	uint64_t data;
 } nty_epoll_event;
 
-typedef struct _nty_epoll_stat {
-	uint64_t calls;
-	uint64_t waits;
-	uint64_t wakes;
 
-	uint64_t issued;
-	uint64_t registered;
-	uint64_t invalidated;
-	uint64_t handled;
-} nty_epoll_stat;
-
-typedef struct _nty_epoll_event_int {
-	nty_epoll_event ev;
-	int sockid;
-} nty_epoll_event_int;
-
-typedef enum {
-	USR_EVENT_QUEUE = 0,
-	USR_SHADOW_EVENT_QUEUE = 1,
-	NTY_EVENT_QUEUE = 2
-} nty_event_queue_type;
+int nty_epoll_create(int size);
+int nty_epoll_ctl(int epid, int op, int sockid, nty_epoll_event *event);
+int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout);
 
 
-typedef struct _nty_event_queue {
-	nty_epoll_event_int *events;
-	int start;
-	int end;
-	int size;
-	int num_events;
-} nty_event_queue;
 
-typedef struct _nty_epoll {
-	nty_event_queue *usr_queue;
-	nty_event_queue *usr_shadow_queue;
-	nty_event_queue *queue;
 
-	uint8_t waiting;
-	nty_epoll_stat stat;
-
-	pthread_cond_t epoll_cond;
-	pthread_mutex_t epoll_lock;
-} nty_epoll;
-
-int nty_epoll_add_event(nty_epoll *ep, int queue_type, struct _nty_socket_map *socket, uint32_t event);
-int nty_close_epoll_socket(int epid);
 
 
 #endif

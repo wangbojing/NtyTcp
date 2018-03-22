@@ -40,70 +40,134 @@
  *
  */
 
-#ifndef __NTY_ADDR_H__
-#define __NTY_ADDR_H__
 
-#include "nty_queue.h"
+#include "nty_api.h"
 
+#include "nty_epoll.h"
+
+#include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-#include <netinet/in.h>
+#include <errno.h>
+
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+
+#include <sys/socket.h>
+#include <sys/types.h>
 
 
-#define NTY_MIN_PORT			1025
-#define NTY_MAX_PORT			65535
+#define EPOLL_SIZE		1024
+#define BUFFER_LENGTH	1024
 
-#ifndef INPORT_ANY
-#define INPORT_ANY 	(uint16_t)0
-#endif
+int main() {
 
+	nty_tcp_setup();
 
-typedef struct _nty_addr_entry {
+	usleep(1);
+
+	int sockfd = nty_socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd < 0) {
+		perror("socket");
+		return 1;
+	}
+
 	struct sockaddr_in addr;
-	TAILQ_ENTRY(_nty_addr_entry) addr_link;
-} nty_addr_entry;
+	memset(&addr, 0, sizeof(struct sockaddr_in));
 
-typedef struct _nty_addr_map {
-	nty_addr_entry *addrmap[NTY_MAX_PORT]; 
-} nty_addr_map;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(9096);
+	addr.sin_addr.s_addr = INADDR_ANY;
 
-typedef struct _nty_addr_pool {
-	nty_addr_entry *pool;
-	nty_addr_map *mapper;
+	if(nty_bind(sockfd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+		perror("bind");
+		return 2;
+	}
 
-	uint32_t addr_base;
+	if (nty_listen(sockfd, 5) < 0) {
+		return 3;
+	}
 
-	int num_addr;
-	int num_entry;
-	int num_free;
-	int num_used;
+	int epoll_fd = nty_epoll_create(EPOLL_SIZE);
+	nty_epoll_event ev, events[EPOLL_SIZE] = {0};
 
-	pthread_mutex_t lock;
-	TAILQ_HEAD(, _nty_addr_entry) free_list;
-	TAILQ_HEAD(, _nty_addr_entry) used_list;
-} nty_addr_pool;
+	ev.events = sockfd;
+	ev.data = (uint64_t)sockfd;
+	nty_epoll_ctl(epoll_fd, NTY_EPOLL_CTL_ADD, sockfd, &ev);
+
+	while (1) {
+
+		int nready = nty_epoll_wait(epoll_fd, events, EPOLL_SIZE, -1);
+		if (nready == -1) {
+			printf("epoll_wait\n");
+			break;
+		} 
+
+		printf("nready : %d\n", nready);
+
+		int i = 0;
+		for (i = 0;i < nready;i ++) {
+
+			if (events[i].data == (uint64_t)sockfd) {
+
+				struct sockaddr_in client_addr;
+				memset(&client_addr, 0, sizeof(struct sockaddr_in));
+				socklen_t client_len = sizeof(client_addr);
+			
+				int clientfd = nty_accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
+				if (clientfd <= 0) continue;
+	
+				char str[INET_ADDRSTRLEN] = {0};
+				printf("recvived from %s at port %d, sockfd:%d, clientfd:%d\n", inet_ntop(AF_INET, &client_addr.sin_addr, str, sizeof(str)),
+					ntohs(client_addr.sin_port), sockfd, clientfd);
+
+				ev.events = NTY_EPOLLIN | NTY_EPOLLET;
+				ev.data = clientfd;
+				nty_epoll_ctl(epoll_fd, NTY_EPOLL_CTL_ADD, clientfd, &ev); 
+				
+			} else {
+
+				int clientfd = (int)events[i].data;
+
+				char buffer[BUFFER_LENGTH] = {0};
+				int ret = nty_recv(clientfd, buffer, BUFFER_LENGTH, 0);
+				if (ret < 0) {
+					if (errno == EAGAIN || errno == EWOULDBLOCK) {
+						printf("read all data");
+					}
+					
+					nty_close(clientfd);
+					
+					ev.events = NTY_EPOLLIN | NTY_EPOLLET;
+					ev.data = clientfd;
+					nty_epoll_ctl(epoll_fd, NTY_EPOLL_CTL_DEL, clientfd, &ev);
+				} else if (ret == 0) {
+					printf(" disconnect %d\n", clientfd);
+					
+					close(clientfd);
+
+					ev.events = NTY_EPOLLIN | NTY_EPOLLET;
+					ev.data = clientfd;
+					nty_epoll_ctl(epoll_fd, NTY_EPOLL_CTL_DEL, clientfd, &ev);
+					
+					break;
+				} else {
+					printf("Recv: %s, %d Bytes\n", buffer, ret);
+				}
+
+			}
+		
+		}
+
+	}
+
+	return 0;
+}
 
 
-nty_addr_pool *CreateAddressPool(in_addr_t addr_base, int num_addr);
-nty_addr_pool *CreateAddressPoolPerCore(int core, int num_queues, 
-		in_addr_t saddr_base, int num_addr, in_addr_t daddr, in_port_t dport);
 
-void DestroyAddressPool(nty_addr_pool *ap);
-int FetchAddress(nty_addr_pool *ap, int core, int num_queues, 
-		const struct sockaddr_in *daddr, struct sockaddr_in *saddr);
-
-int FetchAddressPerCore(nty_addr_pool *ap, int core, int num_queues,
-		    const struct sockaddr_in *daddr, struct sockaddr_in *saddr);
-
-int FreeAddress(nty_addr_pool *ap, const struct sockaddr_in *addr);
-
-
-int GetRSSCPUCore(in_addr_t sip, in_addr_t dip, 
-	      in_port_t sp, in_port_t dp, int num_queues, uint8_t endian_check);
-
-
-#endif
 
 

@@ -29,6 +29,7 @@ $(CUR_OBJS) : %.o : %.c
 	$(CC) -c $^ -o $(ROOT_DIR)/$(OBJS_DIR)/$@
 
 clean :
-	rm -rf $(OBJS_DIR)/* $(BIN_DIR)/*.o
+	rm -rf $(OBJS_DIR)/*
+	rm -rf $(BIN_DIR)/*.o
 
 

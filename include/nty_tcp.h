@@ -50,7 +50,7 @@
 #include "nty_hash.h"
 #include "nty_addr.h"
 
-#include "nty_epoll.h"
+#include "nty_epoll_inner.h"
 
 #define ETH_NUM		4
 
