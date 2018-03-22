@@ -109,41 +109,6 @@ static int nty_eth_process(nty_nic_context *ctx, unsigned char *stream) {
 	return 0;
 }
 
-#if 0
-int main () {
-	nty_thread_context tctx = {0};
-
-	printf("nty_stack start\n");
-
-	int ret = NTY_NIC_INIT(&tctx, "netmap:eth0");
-	if (ret != 0) {
-		printf("init nic failed\n");
-		return NULL;
-	}
-	nty_tcp_init_manager(&tctx);
-
-	nty_nic_context *ctx = (nty_nic_context*)tctx.io_private_context;
-
-	struct pollfd pfd = {0};
-	pfd.fd = ctx->nmr->fd;
-	pfd.events = POLLIN;
-
-	while (1) {
-		ret = poll(&pfd, 1, -1);
-		if (ret < 0) continue;
-
-		if (pfd.revents & POLLIN) {
-			
-			unsigned char *stream = NULL;
-			NTY_NIC_READ(ctx, &stream);
-			nty_eth_process(ctx, stream);
-
-		}
-	}
-
-	return NULL;
-}
-#else
 
 extern nty_tcp_manager *nty_get_tcp_manager(void);
 extern void CheckRtmTimeout(nty_tcp_manager *tcp, uint32_t cur_ts, int thresh);
@@ -187,13 +152,15 @@ static void *nty_tcp_run(void *arg) {
 				nty_tcp_handle_apicall(ts);
 			}
 
+			if (tcp->ep) {
+				nty_epoll_flush_events(ts);
+			}
+
 			nty_tcp_write_chunks(ts);
-			//nty_nic_send_pkts(ctx, 0);
 
 
 		} else if (pfd.revents & POLLOUT) {
 			nty_nic_send_pkts(ctx, 0);
-			//NTY_NIC_WRITE(ctx, ctx->snd_pktbuf,ctx->snd_pkt_size);
 		} 
 				
 	}
@@ -223,5 +190,4 @@ void nty_tcp_setup(void) {
 
 }
 
-#endif
 

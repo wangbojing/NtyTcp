@@ -60,7 +60,7 @@
 #include <sys/types.h>
 
 
-#define EPOLL_SIZE		1024
+#define EPOLL_SIZE		5
 #define BUFFER_LENGTH	1024
 
 int main() {
@@ -92,9 +92,9 @@ int main() {
 	}
 
 	int epoll_fd = nty_epoll_create(EPOLL_SIZE);
-	nty_epoll_event ev, events[EPOLL_SIZE] = {0};
+	nty_epoll_event ev, events[EPOLL_SIZE];
 
-	ev.events = sockfd;
+	ev.events = NTY_EPOLLIN;
 	ev.data = (uint64_t)sockfd;
 	nty_epoll_ctl(epoll_fd, NTY_EPOLL_CTL_ADD, sockfd, &ev);
 
@@ -125,7 +125,7 @@ int main() {
 					ntohs(client_addr.sin_port), sockfd, clientfd);
 
 				ev.events = NTY_EPOLLIN | NTY_EPOLLET;
-				ev.data = clientfd;
+				ev.data = (uint64_t)clientfd;
 				nty_epoll_ctl(epoll_fd, NTY_EPOLL_CTL_ADD, clientfd, &ev); 
 				
 			} else {
@@ -142,7 +142,7 @@ int main() {
 					nty_close(clientfd);
 					
 					ev.events = NTY_EPOLLIN | NTY_EPOLLET;
-					ev.data = clientfd;
+					ev.data = (uint64_t)clientfd;
 					nty_epoll_ctl(epoll_fd, NTY_EPOLL_CTL_DEL, clientfd, &ev);
 				} else if (ret == 0) {
 					printf(" disconnect %d\n", clientfd);
@@ -156,6 +156,7 @@ int main() {
 					break;
 				} else {
 					printf("Recv: %s, %d Bytes\n", buffer, ret);
+					nty_send(clientfd, buffer, ret);
 				}
 
 			}

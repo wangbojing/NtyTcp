@@ -145,6 +145,46 @@ int nty_close_epoll_socket(int epid) {
 	return 0;
 }
 
+//ep   queue copy to usr_queue
+int nty_epoll_flush_events(uint32_t cur_ts) {
+	nty_tcp_manager *tcp = nty_get_tcp_manager();
+	if (!tcp) return -1;
+
+	nty_epoll *ep = tcp->ep;
+	nty_event_queue *usrq = ep->usr_queue;
+	nty_event_queue *tcpq = ep->queue;
+	
+	pthread_mutex_lock(&ep->epoll_lock);
+
+	if (ep->queue->num_events > 0) {
+		while (tcpq->num_events > 0 && usrq->num_events < usrq->size) {
+			usrq->events[usrq->end++] = tcpq->events[tcpq->start ++];
+
+			if (usrq->end >= usrq->size) usrq->end = 0;
+			usrq->num_events ++;
+
+			if (tcpq->start >= tcpq->size) tcpq->start = 0;
+			tcpq->num_events --;
+		}
+	}
+
+	if (ep->waiting && 
+		(ep->usr_queue->num_events > 0 || ep->usr_shadow_queue->num_events > 0)) {
+
+		nty_trace_epoll("Broadcasting events. num: %d, cur_ts: %u, prev_ts: %u\n", 
+				ep->usr_queue->num_events, cur_ts, tcp->ts_last_event);
+		
+		tcp->ts_last_event = cur_ts;
+		ep->stat.wakes ++;
+		pthread_cond_signal(&ep->epoll_cond);
+	}
+
+	pthread_mutex_unlock(&ep->epoll_lock);
+
+	return 0;
+}
+
+
 int nty_epoll_add_event(nty_epoll *ep, int queue_type, struct _nty_socket_map *socket, uint32_t event) {
 	nty_event_queue *eq = NULL;
 
@@ -161,12 +201,12 @@ int nty_epoll_add_event(nty_epoll *ep, int queue_type, struct _nty_socket_map *s
 	} else if (queue_type == USR_SHADOW_EVENT_QUEUE) {
 		eq = ep->usr_shadow_queue;
 	} else {
-		printf("Non-existing event queue type!\n");
+		nty_trace_epoll("Non-existing event queue type!\n");
 		return -1;
 	}
 
 	if (eq->num_events >= eq->size) {
-		printf("Exceeded epoll event queue! num_events: %d, size: %d\n", 
+		nty_trace_epoll("Exceeded epoll event queue! num_events: %d, size: %d\n", 
 				eq->num_events, eq->size);
 		if (queue_type == USR_EVENT_QUEUE)
 			pthread_mutex_unlock(&ep->epoll_lock);
@@ -184,6 +224,7 @@ int nty_epoll_add_event(nty_epoll *ep, int queue_type, struct _nty_socket_map *s
 		eq->end = 0;
 	}
 	eq->num_events ++;
+	nty_trace_epoll("nty_epoll_add_event --> num_events:%d\n", eq->num_events);
 
 	if (queue_type == USR_EVENT_QUEUE) {
 		pthread_mutex_unlock(&ep->epoll_lock);
@@ -200,10 +241,10 @@ int nty_raise_pending_stream_events(nty_epoll *ep, nty_socket_map *socket) {
 	if (!stream) {
 		return -1;
 	}
+	nty_trace_epoll("Stream %d at state %d\n", stream->id, stream->state);
 	if (stream->state < NTY_TCP_ESTABLISHED) {
 		return -1;
 	}
-	printf("Stream %d at state %d\n", stream->id, stream->state);
 
 	if (socket->epoll & NTY_EPOLLIN) {
 		nty_tcp_recv *rcv = stream->rcv;
@@ -218,7 +259,7 @@ int nty_raise_pending_stream_events(nty_epoll *ep, nty_socket_map *socket) {
 		nty_tcp_send *snd = stream->snd;
 		if (!snd->sndbuf || (snd->sndbuf && snd->sndbuf->len < snd->snd_wnd)) {
 			if (!(socket->events & NTY_EPOLLOUT)) {
-				printf("socket %d: adding write event\n", socket->id);
+				nty_trace_epoll("socket %d: adding write event\n", socket->id);
 				nty_epoll_add_event(ep, USR_SHADOW_EVENT_QUEUE, socket, NTY_EPOLLOUT);
 			}
 		}
@@ -270,7 +311,7 @@ int nty_epoll_create(int size) {
 		return -1;
 	}
 
-	printf("epoll structure of size %d created.\n", size);
+	nty_trace_epoll("epoll structure of size %d created.\n", size);
 
 	tcp->ep = ep;
 	epsocket->ep = ep;
@@ -338,8 +379,9 @@ int nty_epoll_ctl(int epid, int op, int sockid, nty_epoll_event *event) {
 		events = event->events;
 		events |= (NTY_EPOLLERR | NTY_EPOLLHUP);
 		socket->ep_data = event->data;
+		socket->epoll = events;
 		
-		printf("Adding epoll socket %d(type %d) ET: %u, IN: %u, OUT: %u\n", 
+		nty_trace_epoll("Adding epoll socket %d(type %d) ET: %u, IN: %u, OUT: %u\n", 
 				socket->id, socket->socktype, socket->epoll & NTY_EPOLLET, 
 				socket->epoll & NTY_EPOLLIN, socket->epoll & NTY_EPOLLOUT);
 
@@ -382,7 +424,7 @@ int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout
 	if (!tcp) return -1;
 
 	if (epid < 0 || epid >= NTY_MAX_CONCURRENCY) {
-		printf("Epoll id %d out of range.\n", epid);
+		nty_trace_epoll("Epoll id %d out of range.\n", epid);
 		errno = EBADF;
 		return -1;
 	}
@@ -405,7 +447,7 @@ int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout
 
 	if (pthread_mutex_lock(&ep->epoll_lock)) {
 		if (errno == EDEADLK) {
-			perror("nty_epoll_wait: epoll_lock blocked\n");
+			nty_trace_epoll("nty_epoll_wait: epoll_lock blocked\n");
 		}
 		assert(0);
 	}
@@ -438,16 +480,17 @@ int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout
 				int ret = pthread_cond_timedwait(&ep->epoll_cond, &ep->epoll_lock, &deadline);
 				if (ret && ret != ETIMEDOUT) {
 					pthread_mutex_unlock(&ep->epoll_lock);
-					printf("pthread_cond_timedwait failed. ret: %d, error: %s\n", 
+					nty_trace_epoll("pthread_cond_timedwait failed. ret: %d, error: %s\n", 
 							ret, strerror(errno));
 					return -1;
 				}
 				timeout = 0;
 			} else if (timeout < 0) {
+				nty_trace_epoll("[%s:%s:%d]: pthread_cond_wait\n", __FILE__, __func__, __LINE__);
 				int ret = pthread_cond_wait(&ep->epoll_cond, &ep->epoll_lock);
 				if (ret) {
 					pthread_mutex_unlock(&ep->epoll_lock);
-					printf("pthread_cond_wait failed. ret: %d, error: %s\n", 
+					nty_trace_epoll("pthread_cond_wait failed. ret: %d, error: %s\n", 
 							ret, strerror(errno));
 					return -1;
 				}
@@ -478,7 +521,7 @@ int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout
 				events[cnt++] = eq->events[eq->start].ev;
 				assert(eq->events[eq->start].sockid >= 0);
 
-				printf("Socket %d: Handled event. event: %s, "
+				nty_trace_epoll("Socket %d: Handled event. event: %s, "
 						"start: %u, end: %u, num: %u\n", 
 						event_socket->id, 
 						EventToString(eq->events[eq->start].ev.events), 
@@ -486,7 +529,7 @@ int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout
 
 				ep->stat.handled ++;
 			} else {
-				printf("Socket %d: event %s invalidated.\n", 
+				nty_trace_epoll("Socket %d: event %s invalidated.\n", 
 						eq->events[eq->start].sockid, 
 						EventToString(eq->events[eq->start].ev.events));
 				ep->stat.invalidated ++;
@@ -515,14 +558,14 @@ int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout
 				events[cnt++] = eq->events[eq->start].ev;
 				assert(eq->events[eq->start].sockid >= 0);
 
-				printf("Socket %d: Handled event. event: %s, "
+				nty_trace_epoll("Socket %d: Handled event. event: %s, "
 						"start: %u, end: %u, num: %u\n", 
 						event_socket->id, 
 						EventToString(eq->events[eq->start].ev.events), 
 						eq->start, eq->end, eq->num_events);
 				ep->stat.handled++;
 			} else {
-				printf("Socket %d: event %s invalidated.\n", 
+				nty_trace_epoll("Socket %d: event %s invalidated.\n", 
 						eq->events[eq->start].sockid, 
 						EventToString(eq->events[eq->start].ev.events));
 				ep->stat.invalidated++;
@@ -541,43 +584,6 @@ int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout
 	pthread_mutex_unlock(&ep->epoll_lock);
 
 	return cnt;
-}
-
-int nty_flush_epoll_events(uint32_t cur_ts) {
-	nty_tcp_manager *tcp = nty_get_tcp_manager();
-	if (!tcp) return -1;
-
-	nty_epoll *ep = tcp->ep;
-	nty_event_queue *usrq = ep->usr_queue;
-	nty_event_queue *tcpq = ep->queue;
-	pthread_mutex_lock(&ep->epoll_lock);
-
-	if (ep->queue->num_events > 0) {
-		while (tcpq->num_events > 0 && usrq->num_events < usrq->size) {
-			usrq->events[usrq->end++] = tcpq->events[tcpq->start ++];
-
-			if (usrq->end >= usrq->size) usrq->end = 0;
-			usrq->num_events ++;
-
-			if (tcpq->start >= tcpq->size) tcpq->start = 0;
-			tcpq->num_events ++;
-		}
-	}
-
-	if (ep->waiting && 
-		(ep->usr_queue->num_events > 0 || ep->usr_shadow_queue->num_events > 0)) {
-
-		printf("Broadcasting events. num: %d, cur_ts: %u, prev_ts: %u\n", 
-				ep->usr_queue->num_events, cur_ts, tcp->ts_last_event);
-		
-		tcp->ts_last_event = cur_ts;
-		ep->stat.wakes ++;
-		pthread_cond_signal(&ep->epoll_cond);
-	}
-
-	pthread_mutex_unlock(&ep->epoll_lock);
-
-	return 0;
 }
 
 
