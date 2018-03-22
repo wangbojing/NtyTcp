@@ -2,6 +2,10 @@
 netmap, dpdp, pf_ring, Tcp Stack for Userspace 
 
 compile:
-# make
+$ make
 run:
-# ./bin/nty_server_example
+$ ./bin/nty_server_example
+
+
+
+
