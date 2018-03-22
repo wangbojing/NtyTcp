@@ -1,0 +1,11 @@
+
+SERVER_EXAMPLE_OBJ = $(BIN_DIR)/nty_example_tcp_server.o
+
+SERVER_EXAMPLE_BIN = nty_server_example
+
+all : $(SERVER_EXAMPLE_BIN)
+
+$(SERVER_EXAMPLE_BIN) : $(SERVER_EXAMPLE_OBJ)
+	$(CC) -o $(BIN_DIR)/$(SERVER_EXAMPLE_BIN) $(OBJS_DIR)/* $(SERVER_EXAMPLE_OBJ) $(FLAG)
+
+
