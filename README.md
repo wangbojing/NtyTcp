@@ -7,9 +7,13 @@ $ make
 
 
 
-run:
+block server run:
 
-$ ./bin/nty_server_example
+$ ./bin/nty_example_block_server
+
+epoll server run:
+
+$ ./bin/nty_example_epoll_rb_server
 
 
 
