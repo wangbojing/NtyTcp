@@ -381,12 +381,10 @@ int nty_accept(int sockid, struct sockaddr *addr, socklen_t *addrlen) {
 		socket->s_addr.sin_port = accepted->dport;
 		socket->s_addr.sin_addr.s_addr = accepted->daddr;
 	}
-
 	if (!(listener->socket->epoll & NTY_EPOLLET) &&
 		!StreamQueueIsEmpty(listener->acceptq)) {
 		nty_epoll_add_event(tcp->ep, USR_SHADOW_EVENT_QUEUE, listener->socket, NTY_EPOLLIN);		
 	}
-
 	nty_trace_api("Stream %d accepted.\n", accepted->id);
 
 	if (addr && addrlen) {
@@ -613,7 +611,7 @@ int nty_close(int sockid) {
 	}
 
 	nty_socket_map *socket = &tcp->smap[sockid];
-	if (socket->socktype != NTY_TCP_SOCK_UNUSED) {
+	if (socket->socktype == NTY_TCP_SOCK_UNUSED) {
 		errno = EINVAL;
 		return -1;
 	}

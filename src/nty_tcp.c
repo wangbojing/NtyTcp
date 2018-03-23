@@ -606,7 +606,8 @@ static inline int nty_tcp_filter_synpkt(nty_tcp_manager *tcp, uint32_t ip, uint1
 	nty_trace_tcp("FilterSYNPacket 111:0x%x, port:%d\n", ip, port);
 	struct _nty_tcp_listener *listener = (struct _nty_tcp_listener*)ListenerHTSearch(tcp->listeners, &port);
 	if (listener == NULL) return 0;
-	
+
+	nty_trace_tcp("FilterSYNPacket 222:0x%x, port:%d\n", ip, port);
 	addr = &listener->socket->s_addr;
 	if (addr->sin_port == port) {
 		if (addr->sin_addr.s_addr != INADDR_ANY) {
@@ -908,23 +909,30 @@ static void nty_tcp_handle_syn_rcvd(nty_tcp_manager *tcp, uint32_t cur_ts,
 		}
 		//
 		AddtoTimeoutList(tcp, cur_stream);
-#if 1	
+
 		nty_trace_tcp(" [%s:%s:%d]: nty_tcp_handle_syn_rcvd : %x\n", 
 			__FILE__, __func__, __LINE__, listener->socket->epoll);
-		if (listener->socket && (listener->socket->epoll & NTY_EPOLLIN)) {
+		if (listener->socket ) {
+			//&& 
+			/*
+			 * should move to epoll for check socket->epoll type.
+			 */
 			//AddtoEpollEvent
-			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, listener->socket, NTY_EPOLLIN);
-
+#if NTY_ENABLE_EPOLL_RB
+			if (tcp->ep) {
+				epoll_event_callback(tcp->ep, listener->socket->id, NTY_EPOLLIN);
+			} 
+#else
+			if (listener->socket->epoll & NTY_EPOLLIN) {
+				nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, listener->socket, NTY_EPOLLIN);
+			}
+#endif
+			if (!(listener->socket->opts & NTY_TCP_NONBLOCK)){
+				nty_tcp_flush_accept_event(listener);
+			}
 			
 		}
-		if (listener->socket && !(listener->socket->opts & NTY_TCP_NONBLOCK)) {
-			nty_tcp_flush_accept_event(listener);
-		}
-#else
-		if (listener->socket) {
-			nty_tcp_flush_accept_event(listener);
-		}
-#endif
+
 	} else {
 		nty_trace_tcp("Stream %d (TCP_ST_SYN_RCVD): No ACK.\n", 
 				cur_stream->id);
@@ -973,7 +981,17 @@ void nty_tcp_handle_established(nty_tcp_manager *tcp, uint32_t cur_ts,
 			nty_tcp_addto_controllist(tcp, cur_stream);
 			//Raise Read Event
 			nty_trace_tcp("nty_tcp_flush_read_event\n");
-			nty_tcp_flush_read_event(cur_stream->rcv);
+
+#if NTY_ENABLE_EPOLL_RB
+			if (tcp->ep) {
+				epoll_event_callback(tcp->ep, cur_stream->socket->id, NTY_EPOLLIN);
+			}
+#endif
+			
+			if (cur_stream->socket && !(cur_stream->socket->opts & NTY_TCP_NONBLOCK)) {
+				nty_tcp_flush_read_event(cur_stream->rcv);
+			}
+			
 		} else {
 			nty_tcp_enqueue_acklist(tcp, cur_stream, cur_ts, ACK_OPT_NOW);
 			return ;
@@ -1243,6 +1261,8 @@ static int nty_tcp_process_payload(nty_tcp_manager *tcp, nty_tcp_stream *cur_str
 			cur_stream->state = NTY_TCP_CLOSED;
 			cur_stream->close_reason = TCP_NO_MEM;
 			//Raise Error Event
+			nty_trace_tcp(" Raise Error Event \n");
+			
 			return -1;
 		}
 	}
@@ -1287,13 +1307,22 @@ static int nty_tcp_process_payload(nty_tcp_manager *tcp, nty_tcp_stream *cur_str
 	if (cur_stream->state == NTY_TCP_ESTABLISHED) {
 		//RaiseReadEvent
 		//cur_stream->socket
-		if (cur_stream->socket && (cur_stream->socket->epoll & NTY_EPOLLIN)) {
+		if (cur_stream->socket) {
+			// && (cur_stream->socket->epoll & NTY_EPOLLIN)
+			// should move to epoll for check epoll type
 			//AddtoEpollEvent
+#if NTY_ENABLE_EPOLL_RB
+			if (tcp->ep) {
+				epoll_event_callback(tcp->ep, cur_stream->socket->id, NTY_EPOLLIN);
+			} 
+			
+#else
 			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, cur_stream->socket, NTY_EPOLLIN);
-
+#endif
+			if (!(cur_stream->socket->opts & NTY_TCP_NONBLOCK)) {
+				nty_tcp_flush_read_event(rcv);
+			}
 		}
-		if (!(cur_stream->socket->opts & NTY_TCP_NONBLOCK))
-			nty_tcp_flush_read_event(rcv);
 	}
 	return 1;
 }

@@ -151,11 +151,11 @@ static void *nty_tcp_run(void *arg) {
 				
 				nty_tcp_handle_apicall(ts);
 			}
-
+#if (NTY_ENABLE_EPOLL_RB == 0)
 			if (tcp->ep) {
 				nty_epoll_flush_events(ts);
 			}
-
+#endif
 			nty_tcp_write_chunks(ts);
 
 

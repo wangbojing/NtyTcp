@@ -97,7 +97,11 @@ void InitializeTCPStreamManager()
 void RaiseReadEvent(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 	if (stream->socket) {
 		if (stream->socket->epoll & NTY_EPOLLIN) {
+#if NTY_ENABLE_EPOLL_RB
+			epoll_event_callback(tcp->ep, stream->socket->id, NTY_EPOLLIN);
+#else	
 			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, stream->socket, NTY_EPOLLIN);
+#endif
 #if NTY_ENABLE_BLOCKING
 		} else if (!(stream->socket->opts & NTY_TCP_NONBLOCK)) {
 			if (!stream->on_rcv_br_list) {
@@ -115,7 +119,12 @@ void RaiseReadEvent(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 void RaiseWriteEvent(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 	if (stream->socket) {
 		if (stream->socket->epoll & NTY_EPOLLOUT) {
+#if NTY_ENABLE_EPOLL_RB
+			//should be stream callback
+			epoll_event_callback(tcp->ep, stream->socket->id, NTY_EPOLLOUT);
+#else
 			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, stream->socket, NTY_EPOLLOUT);
+#endif
 #if NTY_ENABLE_BLOCKING
 		} else if (!(stream->socket->opts & NTY_TCP_NONBLOCK)) {
 			if (!stream->on_snd_br_list) {
@@ -133,7 +142,11 @@ void RaiseWriteEvent(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 void RaiseCloseEvent(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 	if (stream->socket) {
 		if (stream->socket->epoll & NTY_EPOLLRDHUP) {
+#if NTY_ENABLE_EPOLL_RB
+			epoll_event_callback(tcp->ep, stream->socket->id, NTY_EPOLLRDHUP);
+#else
 			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, stream->socket, NTY_EPOLLRDHUP);
+#endif
 #if NTY_ENABLE_BLOCKING
 		} else if (!(stream->socket->opts & NTY_TCP_NONBLOCK)) {
 			if (!stream->on_rcv_br_list) {
@@ -156,7 +169,11 @@ void RaiseCloseEvent(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 void RaiseErrorEvent(nty_tcp_manager *tcp, nty_tcp_stream *stream) {
 	if (stream->socket) {
 		if (stream->socket->epoll & NTY_EPOLLERR) {
+#if NTY_ENABLE_EPOLL_RB
+			epoll_event_callback(tcp->ep, stream->socket->id, NTY_EPOLLERR);
+#else
 			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, stream->socket, NTY_EPOLLERR);
+#endif
 #if NTY_ENABLE_BLOCKING
 		} else if (!(stream->socket->opts & NTY_TCP_NONBLOCK)) {
 			if (!stream->on_rcv_br_list) {
