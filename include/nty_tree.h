@@ -384,7 +384,7 @@ struct {													\
 #define	RB_GENERATE(name, type, field, cmp)									\
 	RB_GENERATE_INTERNAL(name, type, field, cmp,)
 #define	RB_GENERATE_STATIC(name, type, field, cmp)							\
-	RB_GENERATE_INTERNAL(name, type, field, cmp, __unused static)
+	RB_GENERATE_INTERNAL(name, type, field, cmp, static)
 #define RB_GENERATE_INTERNAL(name, type, field, cmp, attr)					\
 attr void																	\
 name##_RB_INSERT_COLOR(struct name *head, struct type *elm)	{				\

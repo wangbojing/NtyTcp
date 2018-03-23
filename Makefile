@@ -3,7 +3,7 @@ CC = gcc
 #CC = /usr/bin/gcc-5
 SUB_DIRS = app/ src/
 BIN = nty_stack
-FLAG = -lpthread -lhugetlbfs -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -I $(ROOT_DIR)/include
+FLAG = -lpthread -lhugetlbfs -g -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -Wno-unused-function -I $(ROOT_DIR)/include
 
 ROOT_DIR = $(shell pwd)
 BIN_DIR = $(ROOT_DIR)/bin

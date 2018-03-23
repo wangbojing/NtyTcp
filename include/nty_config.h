@@ -40,107 +40,50 @@
  *
  */
 
+#ifndef __NTY_CONFIG_H__
+#define __NTY_CONFIG_H__
 
 
 
-#ifndef __NTY_EPOLL_H__
-#define __NTY_EPOLL_H__
+#define NTY_SELF_IP		"192.168.0.105"//"192.168.1.108" //"192.168.1.132" //"192.168.1.131"  //
+#define NTY_SELF_IP_HEX	0x6900A8C0 //0x8301A8C0 //
+#define NTY_SELF_MAC	"00:0c:29:58:6f:f4"
 
-#include <stdint.h>
-#include "nty_config.h"
+#define NTY_MAX_CONCURRENCY		1024
+#define NTY_SNDBUF_SIZE			8192
+#define NTY_RCVBUF_SIZE			8192
+#define NTY_MAX_NUM_BUFFERS		1024
+#define NTY_BACKLOG_SIZE		1024
 
-typedef enum {
+#define NTY_ENABLE_MULTI_NIC	0
+#define NTY_ENABLE_BLOCKING		1
 
-	NTY_EPOLLNONE 	= 0x0000,
-	NTY_EPOLLIN 	= 0x0001,
-	NTY_EPOLLPRI	= 0x0002,
-	NTY_EPOLLOUT	= 0x0004,
-	NTY_EPOLLRDNORM = 0x0040,
-	NTY_EPOLLRDBAND = 0x0080,
-	NTY_EPOLLWRNORM = 0x0100,
-	NTY_EPOLLWRBAND = 0x0200,
-	NTY_EPOLLMSG	= 0x0400,
-	NTY_EPOLLERR	= 0x0008,
-	NTY_EPOLLHUP 	= 0x0010,
-	NTY_EPOLLRDHUP 	= 0x2000,
-	NTY_EPOLLONESHOT = (1 << 30),
-	NTY_EPOLLET 	= (1 << 31)
-
-} nty_epoll_type;
+#define NTY_ENABLE_EPOLL_RB		1
 
 
-typedef enum {
-	NTY_EPOLL_CTL_ADD = 1,
-	NTY_EPOLL_CTL_DEL = 2,
-	NTY_EPOLL_CTL_MOD = 3,
-} nty_epoll_op; 
-
-
-typedef union _nty_epoll_data {
-	void *ptr;
-	int sockid;
-	uint32_t u32;
-	uint64_t u64;
-} nty_epoll_data;
-
-typedef struct {
-	uint32_t events;
-	uint64_t data;
-} nty_epoll_event;
-
-
-int nty_epoll_create(int size);
-int nty_epoll_ctl(int epid, int op, int sockid, nty_epoll_event *event);
-int nty_epoll_wait(int epid, nty_epoll_event *events, int maxevents, int timeout);
-
-
-#if NTY_ENABLE_EPOLL_RB
-
-
-
-enum EPOLL_EVENTS {
-	EPOLLNONE 	= 0x0000,
-	EPOLLIN 	= 0x0001,
-	EPOLLPRI	= 0x0002,
-	EPOLLOUT	= 0x0004,
-	EPOLLRDNORM = 0x0040,
-	EPOLLRDBAND = 0x0080,
-	EPOLLWRNORM = 0x0100,
-	EPOLLWRBAND = 0x0200,
-	EPOLLMSG	= 0x0400,
-	EPOLLERR	= 0x0008,
-	EPOLLHUP 	= 0x0010,
-	EPOLLRDHUP 	= 0x2000,
-	EPOLLONESHOT = (1 << 30),
-	EPOLLET 	= (1 << 31)
-
-};
-
-#define EPOLL_CTL_ADD	1
-#define EPOLL_CTL_DEL	2
-#define EPOLL_CTL_MOD	3
-
-typedef union epoll_data {
-	void *ptr;
-	int fd;
-	uint32_t u32;
-	uint64_t u64;
-} epoll_data_t;
-
-struct epoll_event {
-	uint32_t events;
-	epoll_data_t data;
-};
-
-int epoll_create(int size);
-int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event);
-int epoll_wait(int epid, struct epoll_event *events, int maxevents, int timeout);
-
-
-
+//#define NTY_DEBUG 1
+#ifdef NTY_DEBUG
+#define ntydbg(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_api(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_tcp(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_buffer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_eth(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_ip(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_timer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define nty_trace_epoll(format, ...)	fprintf(stdout, format, ##__VA_ARGS__)
+#else
+#define ntydbg(format, ...) 
+#define nty_trace_api(format, ...)
+#define nty_trace_tcp(format, ...) 
+#define nty_trace_buffer(format, ...)
+#define nty_trace_eth(format, ...)
+#define nty_trace_ip(format, ...)
+#define nty_trace_timer(format, ...)
+#define nty_trace_epoll(format, ...)
 
 
 #endif
+
 
 
 

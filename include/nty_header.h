@@ -55,20 +55,9 @@
 
 #include <sys/poll.h>
 
+#include "nty_config.h"
 
 
-#define NTY_SELF_IP		"192.168.1.127"//"192.168.1.108" //"192.168.1.132" //"192.168.1.131"  //
-#define NTY_SELF_IP_HEX	0x7F01A8C0 //0x8301A8C0 //
-#define NTY_SELF_MAC	"00:0c:29:58:6f:f4"
-
-#define NTY_MAX_CONCURRENCY		1024
-#define NTY_SNDBUF_SIZE			8192
-#define NTY_RCVBUF_SIZE			8192
-#define NTY_MAX_NUM_BUFFERS		1024
-#define NTY_BACKLOG_SIZE		1024
-
-#define NTY_ENABLE_MULTI_NIC	0
-#define NTY_ENABLE_BLOCKING		1
 
 #define ETH_ALEN		6
 
@@ -171,28 +160,6 @@ struct icmppkt {
 
 //unsigned short in_cksum(unsigned short *addr, int len);
 
-//#define NTY_DEBUG 1
-#ifdef NTY_DEBUG
-#define ntydbg(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_api(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_tcp(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_buffer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_eth(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_ip(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_timer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_epoll(format, ...)	fprintf(stdout, format, ##__VA_ARGS__)
-#else
-#define ntydbg(format, ...) 
-#define nty_trace_api(format, ...)
-#define nty_trace_tcp(format, ...) 
-#define nty_trace_buffer(format, ...)
-#define nty_trace_eth(format, ...)
-#define nty_trace_ip(format, ...)
-#define nty_trace_timer(format, ...)
-#define nty_trace_epoll(format, ...)
-
-
-#endif
 
 
 #endif

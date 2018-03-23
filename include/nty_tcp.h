@@ -376,8 +376,11 @@ typedef struct _nty_tcp_manager {
 	uint32_t flow_cnt;
 
 	nty_thread_context *ctx;
-
+#if NTY_ENABLE_EPOLL_RB
+	void *ep;
+#else
 	struct _nty_epoll *ep;
+#endif
 	uint32_t ts_last_event;
 
 	struct _nty_hashtable *listeners;

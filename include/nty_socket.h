@@ -59,7 +59,11 @@ typedef struct _nty_socket_map {
 	union {
 		struct _nty_tcp_stream *stream;
 		struct _nty_tcp_listener *listener;
+#if NTY_ENABLE_EPOLL_RB
+		void *ep;
+#else
 		struct _nty_epoll *ep;
+#endif
 		//struct pipe *pp;
 	};
 
