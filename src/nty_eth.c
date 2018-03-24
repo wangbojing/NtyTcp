@@ -130,6 +130,25 @@ static void *nty_tcp_run(void *arg) {
 		
 		int ret = poll(&pfd, 1, -1);
 		if (ret < 0) continue;
+
+		// check send data should 
+		struct timeval cur_ts = {0};
+		gettimeofday(&cur_ts, NULL);
+		uint32_t ts = TIMEVAL_TO_TS(&cur_ts);
+
+		if (tcp->flow_cnt > 0) {
+			CheckRtmTimeout(tcp, ts, NTY_MAX_CONCURRENCY);
+			CheckTimewaitExpire(tcp, ts, NTY_MAX_CONCURRENCY);
+			CheckConnectionTimeout(tcp, ts, NTY_MAX_CONCURRENCY);
+			
+			nty_tcp_handle_apicall(ts);
+		}
+#if (NTY_ENABLE_EPOLL_RB == 0)
+		if (tcp->ep) {
+			nty_epoll_flush_events(ts);
+		}
+#endif
+		nty_tcp_write_chunks(ts);
 		
 		if (!(pfd.revents & POLLERR)) ctx->dev_poll_flag = 1;
 
@@ -137,29 +156,10 @@ static void *nty_tcp_run(void *arg) {
 
 			unsigned char *stream = NULL;
 			nty_nic_read(ctx, &stream);
-
 			nty_eth_process(ctx, stream);
 
-			struct timeval cur_ts = {0};
-			gettimeofday(&cur_ts, NULL);
-			uint32_t ts = TIMEVAL_TO_TS(&cur_ts);
-
-			if (tcp->flow_cnt > 0) {
-				CheckRtmTimeout(tcp, ts, NTY_MAX_CONCURRENCY);
-				CheckTimewaitExpire(tcp, ts, NTY_MAX_CONCURRENCY);
-				CheckConnectionTimeout(tcp, ts, NTY_MAX_CONCURRENCY);
-				
-				nty_tcp_handle_apicall(ts);
-			}
-#if (NTY_ENABLE_EPOLL_RB == 0)
-			if (tcp->ep) {
-				nty_epoll_flush_events(ts);
-			}
-#endif
-			nty_tcp_write_chunks(ts);
-
-
 		} else if (pfd.revents & POLLOUT) {
+
 			nty_nic_send_pkts(ctx, 0);
 		} 
 				
