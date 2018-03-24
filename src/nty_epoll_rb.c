@@ -148,7 +148,7 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event) {
 
 		pthread_mutex_lock(&ep->mtx);
 
-		struct epitem tmp = {0};
+		struct epitem tmp;
 		tmp.sockfd = sockid;
 		struct epitem *epi = RB_FIND(_epoll_rb_socket, &ep->rbr, &tmp);
 		if (epi) {
@@ -176,7 +176,7 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event) {
 
 		pthread_mutex_lock(&ep->mtx);
 
-		struct epitem tmp = {0};
+		struct epitem tmp;
 		tmp.sockfd = sockid;
 		struct epitem *epi = RB_REMOVE(_epoll_rb_socket, &ep->rbr, &tmp);
 		if (!epi) {
@@ -191,7 +191,7 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event) {
 
 	} else if (op == EPOLL_CTL_MOD) {
 
-		struct epitem tmp = {0};
+		struct epitem tmp;
 		tmp.sockfd = sockid;
 		struct epitem *epi = RB_FIND(_epoll_rb_socket, &ep->rbr, &tmp);
 		if (epi) {
@@ -331,7 +331,7 @@ int epoll_wait(int epid, struct epoll_event *events, int maxevents, int timeout)
  */
 int epoll_event_callback(struct eventpoll *ep, int sockid, uint32_t event) {
 
-	struct epitem tmp = {0};
+	struct epitem tmp;
 	tmp.sockfd = sockid;
 	struct epitem *epi = RB_FIND(_epoll_rb_socket, &ep->rbr, &tmp);
 	if (!epi) {
