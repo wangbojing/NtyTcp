@@ -274,7 +274,6 @@ int epoll_wait(int epid, struct epoll_event *events, int maxevents, int timeout)
 			timeout = 0;
 		} else if (timeout < 0) {
 
-			nty_trace_epoll("epoll_wait --> 333 rdnum: %d\n", ep->rdnum);
 			int ret = pthread_cond_wait(&ep->cond, &ep->cdmtx);
 			if (ret) {
 				nty_trace_epoll("pthread_cond_wait\n");
@@ -282,18 +281,9 @@ int epoll_wait(int epid, struct epoll_event *events, int maxevents, int timeout)
 
 				return -1;
 			}
-			nty_trace_epoll("epoll_wait --> 444 rdnum: %d\n", ep->rdnum);
 		}
 		ep->waiting = 0; 
-#if 0
-		if (tcp->ctx->done || tcp->ctx->exit || tcp->ctx->interrupt) {
-			tcp->ctx->interrupt = 0;
-			pthread_mutex_unlock(&ep->cdmtx);
-			
-			errno = EINTR;
-			return -1;
-		}
-#endif
+
 	}
 
 	pthread_mutex_unlock(&ep->cdmtx);
@@ -310,14 +300,12 @@ int epoll_wait(int epid, struct epoll_event *events, int maxevents, int timeout)
 		LIST_REMOVE(epi, rdlink);
 		epi->rdy = 0;
 
-
 		memcpy(&events[i++], &epi->event, sizeof(struct epoll_event));
 		
 		num --;
 		cnt ++;
 		ep->rdnum --;
 	}
-	
 	
 	pthread_spin_unlock(&ep->lock);
 
@@ -344,6 +332,7 @@ int epoll_event_callback(struct eventpoll *ep, int sockid, uint32_t event) {
 	} 
 
 	printf("epoll_event_callback --> %d\n", epi->sockfd);
+	
 	pthread_spin_lock(&ep->lock);
 	epi->rdy = 1;
 	LIST_INSERT_HEAD(&ep->rdlist, epi, rdlink);

@@ -50,6 +50,8 @@
 #include "nty_hash.h"
 #include "nty_addr.h"
 
+#include "nty_config.h"
+
 #include "nty_epoll_inner.h"
 
 #define ETH_NUM		4
@@ -290,6 +292,9 @@ typedef struct _nty_tcp_send {
 } nty_tcp_send; //__attribute__((packed))
 
 typedef struct _nty_tcp_stream {
+#if NTY_ENABLE_SOCKET_C10M
+	struct _nty_socket *s;
+#endif
 	struct _nty_socket_map *socket;
 	uint32_t id:24,
 			 stream_type:8;
@@ -367,9 +372,14 @@ typedef struct _nty_tcp_manager {
 	
 	struct _nty_hashtable *tcp_flow_table;
 
+#if NTY_ENABLE_SOCKET_C10M
+	struct _nty_socket_table *fdtable;
+#endif
+
 	uint32_t s_index;
 	struct _nty_socket_map *smap;
 	TAILQ_HEAD(, _nty_socket_map) free_smap;
+
 
 	struct _nty_addr_pool *ap;
 	uint32_t gid;
@@ -425,6 +435,11 @@ typedef struct _nty_tcp_manager {
 
 typedef struct _nty_tcp_listener {
 	int sockid;
+
+#if NTY_ENABLE_SOCKET_C10M
+	struct _nty_socket *s;
+#endif
+	
 	struct _nty_socket_map *socket;
 
 	int backlog;

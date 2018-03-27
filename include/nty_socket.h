@@ -47,6 +47,9 @@
 
 #include "nty_buffer.h"
 #include "nty_tcp.h"
+#include "nty_config.h"
+
+#include <pthread.h>
 
 
 typedef struct _nty_socket_map {
@@ -85,6 +88,47 @@ void nty_free_socket(int sockid, int need_lock);
 nty_socket_map *nty_get_socket(int sockid);
 
 
+/*
+ * rebuild socket module for support 10M
+ */
+#if NTY_ENABLE_SOCKET_C10M
+
+
+struct _nty_socket {
+	int id;	
+	int socktype;
+
+	uint32_t opts;
+	struct sockaddr_in s_addr;
+
+	union {
+		struct _nty_tcp_stream *stream;
+		struct _nty_tcp_listener *listener;
+		void *ep;
+	};
+	struct _nty_socket_table *socktable;
+};
+
+
+struct _nty_socket_table {
+	size_t max_fds;
+	int cur_idx;
+	struct _nty_socket **sockfds;
+	unsigned char *open_fds;
+	pthread_spinlock_t lock;
+};
+
+struct _nty_socket* nty_socket_allocate(int socktype);
+
+void nty_socket_free(int sockid);
+
+struct _nty_socket* nty_socket_get(int sockid);
+
+struct _nty_socket_table * nty_socket_init_fdtable(void);
+
+
+
+#endif
 
 #endif
 

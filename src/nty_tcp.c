@@ -1764,6 +1764,16 @@ int nty_tcp_init_manager(nty_thread_context *ctx) {
 
 	InitializeTCPStreamManager();
 
+#if NTY_ENABLE_SOCKET_C10M
+
+	tcp->fdtable = nty_socket_init_fdtable();
+	if (!tcp->fdtable) {
+		nty_trace_tcp("Failed to create fdtable.\n");
+		return -4;
+	}
+
+#endif
+
 	tcp->smap = (nty_socket_map*)calloc(NTY_MAX_CONCURRENCY, sizeof(nty_socket_map));
 	if (!tcp->smap) {
 		nty_trace_tcp("Failed to allocate memory for stream map.\n");
@@ -1779,7 +1789,7 @@ int nty_tcp_init_manager(nty_thread_context *ctx) {
 		tcp->smap[i].stream = NULL;
 		TAILQ_INSERT_TAIL(&tcp->free_smap, &tcp->smap[i], free_smap_link);
 	}
-
+	
 	tcp->ctx = ctx;
 
 	tcp->connectq = CreateStreamQueue(NTY_BACKLOG_SIZE);
