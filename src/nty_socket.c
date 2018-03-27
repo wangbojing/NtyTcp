@@ -317,13 +317,14 @@ struct _nty_socket* nty_socket_allocate(int socktype) {
 	
 	pthread_spin_unlock(&sock_table->lock);
 
-
 	s->socktype = socktype;
 	s->opts = 0;
 	s->socktable = sock_table;
 	s->stream = NULL;
 
 	memset(&s->s_addr, 0, sizeof(struct sockaddr_in));
+
+	UNUSED(byte);
 
 	return s;
 }
@@ -339,11 +340,14 @@ void nty_socket_free(int sockid) {
 
 	char byte = nty_socket_unuse_id(sock_table->open_fds, sockid);
 	nty_trace_socket("nty_socket_free --> nty_socket_unuse_id : %x\n", byte);
+
 	sock_table->cur_idx = nty_socket_set_start(sockid);
 	
 	pthread_spin_unlock(&sock_table->lock);
 
 	free(s);
+
+	UNUSED(byte);
 
 	return ;
 }

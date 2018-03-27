@@ -68,7 +68,7 @@
 
 //#define NTY_DEBUG 1
 #ifdef NTY_DEBUG
-#define ntydbg(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
+#define ntydbg(format, ...) 		fprintf(stdout, " File:"__FILE__",line:%05d:"format, __LINE__, ##__VA_ARGS__)
 #define nty_trace_api(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
 #define nty_trace_tcp(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
 #define nty_trace_buffer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
@@ -92,7 +92,7 @@
 
 #endif
 
-
+#define UNUSED(expr)	do {(void)(expr); } while(0)
 
 
 #endif
