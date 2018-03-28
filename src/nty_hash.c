@@ -89,14 +89,15 @@ int EqualFlow(const void *f1, const void *f2) {
 
 unsigned int HashListener(const void *l) {
 	nty_tcp_listener *listener = (nty_tcp_listener*)l;
-	return listener->socket->s_addr.sin_port & (NUM_BINS_LISTENERS - 1);
+
+	return listener->s->s_addr.sin_port & (NUM_BINS_LISTENERS - 1);
 }
 
 int EqualListener(const void *l1, const void *l2) {
 	nty_tcp_listener *listener1 = (nty_tcp_listener*)l1;
 	nty_tcp_listener *listener2 = (nty_tcp_listener*)l2;
 
-	return (listener1->socket->s_addr.sin_port == listener2->socket->s_addr.sin_port);
+	return (listener1->s->s_addr.sin_port == listener2->s->s_addr.sin_port);
 }
 
 
@@ -245,10 +246,11 @@ ListenerHTSearch(nty_hashtable *ht, const void *it)
 	uint16_t port = *((uint16_t *)it);
 	nty_tcp_listener *walk;
 	list_bucket_head *head;
-	nty_socket_map s;
+
+	struct _nty_socket s;
 
 	s.s_addr.sin_port = port;
-	item.socket = &s;
+	item.s = &s;
 
 	idx = ht->hashfn(&item);
 

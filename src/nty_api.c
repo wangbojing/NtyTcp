@@ -756,22 +756,23 @@ int nty_connect(int sockid, const struct sockaddr *addr, socklen_t addrlen) {
 
 #if NTY_ENABLE_POSIX_API
 
+
 int socket(int domain, int type, int protocol) {
 	
 	if (domain != AF_INET) {
-		errno = -EAFNOSUPPORT;
+		errno = EAFNOSUPPORT;
 		return -1;
 	}
 	if (type == SOCK_STREAM) {
 		type = NTY_TCP_SOCK_STREAM;
 	} else {
-		errno = -EINVAL;
+		errno = EINVAL;
 		return -1;
 	}
 
 	struct _nty_socket *socket = nty_socket_allocate(type);
 	if (!socket) {
-		errno = -ENFILE;
+		errno = ENFILE;
 		return -1;
 	}
 
@@ -783,17 +784,19 @@ int bind(int sockid, const struct sockaddr *addr, socklen_t addrlen) {
 	if (!tcp) return -1;
 
 	if (sockid < 0) {
-		errno = -EBADF;
+		errno = EBADF;
 		return -1;
 	}
 
 	if (tcp->fdtable == NULL) {
-		errno = -EBADF;
+		errno = EBADF;
 		return -1;
 	}
+
+	nty_trace_api(" Enter Bind \n");
 	struct _nty_socket *s = tcp->fdtable->sockfds[sockid];
 	if (s == NULL) {
-		errno = -EBADF;
+		errno = EBADF;
 		return -1;
 	}
 
@@ -806,25 +809,25 @@ int bind(int sockid, const struct sockaddr *addr, socklen_t addrlen) {
 	if (s->socktype != NTY_TCP_SOCK_STREAM &&
 		s->socktype != NTY_TCP_SOCK_LISTENER) {
 		nty_trace_api("Not a stream socket id: %d\n", sockid);
-		errno = -ENOTSOCK;
+		errno = ENOTSOCK;
 		return -1;
 	}
 
 	if (!addr) {
 		nty_trace_api("Socket %d: empty address!\n", sockid);
-		errno = -EINVAL;
+		errno = EINVAL;
 		return -1;
 	}
 
 	if (s->opts & NTY_TCP_ADDR_BIND) {
 		nty_trace_api("Socket %d: adress already bind for this socket.\n", sockid);
-		errno = -EINVAL;
+		errno = EINVAL;
 		return -1;
 	}
 
 	if (addr->sa_family != AF_INET || addrlen < sizeof(struct sockaddr_in)) {
 		nty_trace_api("Socket %d: invalid argument!\n", sockid);
-		errno = -EINVAL;
+		errno = EINVAL;
 		return -1;
 	}
 
@@ -849,12 +852,14 @@ int listen(int sockid, int backlog) {
 		errno = -EBADF;
 		return -1;
 	}
+	nty_trace_api(" Enter listen\n");
 	struct _nty_socket *s = tcp->fdtable->sockfds[sockid];
 	if (s == NULL) {
 		errno = -EBADF;
 		return -1;
 	}
-	
+
+	nty_trace_api(" Enter listen 1111\n");
 	if (s->socktype == NTY_TCP_SOCK_UNUSED) {
 		nty_trace_api("Socket %d: invalid argument!\n", sockid);
 		errno = -EBADF;
@@ -881,7 +886,6 @@ int listen(int sockid, int backlog) {
 
 	listener->sockid = sockid;
 	listener->backlog = backlog;
-	//listener->socket = &tcp->smap[sockid];
 	listener->s = s;
 
 	if (pthread_cond_init(&listener->accept_cond, NULL)) {
@@ -902,10 +906,13 @@ int listen(int sockid, int backlog) {
 		errno = -ENOMEM;
 		return -1;
 	}
+	listener->sockid = sockid;
 
+	nty_trace_api(" CreateStreamQueue \n");
 	s->listener = listener;
 	ListenerHTInsert(tcp->listeners, listener);
 
+	nty_trace_api(" ListenerHTInsert \n");
 	return 0;
 }
 
@@ -938,10 +945,11 @@ int accept(int sockid, struct sockaddr *addr, socklen_t *addrlen) {
 	nty_tcp_listener *listener = s->listener;
 	nty_tcp_stream *accepted = StreamDequeue(listener->acceptq);
 	if (!accepted) {
-		if (listener->socket->opts & NTY_TCP_NONBLOCK) {
-			errno = EAGAIN;
+		if (listener->s->opts & NTY_TCP_NONBLOCK) {
+			errno = -EAGAIN;
 			return -1;
 		} else {
+			nty_trace_api(" Enter accept :%d, sockid:%d\n", s->id, sockid);
 			pthread_mutex_lock(&listener->accept_lock);
 			while (accepted == NULL && ((accepted = StreamDequeue(listener->acceptq)) == NULL)) {
 				pthread_cond_wait(&listener->accept_cond, &listener->accept_lock);
@@ -949,7 +957,7 @@ int accept(int sockid, struct sockaddr *addr, socklen_t *addrlen) {
 				//printf("");
 				if (tcp->ctx->done || tcp->ctx->exit) {
 					pthread_mutex_unlock(&listener->accept_lock);
-					errno = EINTR;
+					errno = -EINTR;
 					return -1;
 				}
 			}
@@ -974,12 +982,7 @@ int accept(int sockid, struct sockaddr *addr, socklen_t *addrlen) {
 		socket->s_addr.sin_port = accepted->dport;
 		socket->s_addr.sin_addr.s_addr = accepted->daddr;
 	}
-#if 0
-	if (!(listener->socket->epoll & NTY_EPOLLET) &&
-		!StreamQueueIsEmpty(listener->acceptq)) {
-		nty_epoll_add_event(tcp->ep, USR_SHADOW_EVENT_QUEUE, listener->socket, NTY_EPOLLIN);		
-	}
-#endif
+
 	nty_trace_api("Stream %d accepted.\n", accepted->id);
 
 	if (addr && addrlen) {
@@ -999,26 +1002,26 @@ ssize_t recv(int sockid, void *buf, size_t len, int flags) {
 	if (!tcp) return -1;
 
 	if (sockid < 0) {
-		errno = -EBADF;
+		errno = EBADF;
 		return -1;
 	}
 
 	if (tcp->fdtable == NULL) {
-		errno = -EBADF;
+		errno = EBADF;
 		return -1;
 	}
 	struct _nty_socket *s = tcp->fdtable->sockfds[sockid];
 	if (s == NULL) {
-		errno = -EBADF;
+		errno = EBADF;
 		return -1;
 	}
 	if (s->socktype == NTY_TCP_SOCK_UNUSED) {
-		errno = -EINVAL;
+		errno = EINVAL;
 		return -1;
 	}
 	
 	if (s->socktype != NTY_TCP_SOCK_STREAM) {
-		errno = -ENOTSOCK;
+		errno = ENOTSOCK;
 		return -1;
 	}
 	
@@ -1029,7 +1032,7 @@ ssize_t recv(int sockid, void *buf, size_t len, int flags) {
 		  cur_stream->state == NTY_TCP_CLOSE_WAIT ||
 		  cur_stream->state == NTY_TCP_FIN_WAIT_1 ||
 		  cur_stream->state == NTY_TCP_FIN_WAIT_2)) {
-		errno = -ENOTCONN;
+		errno = ENOTCONN;
 		return -1;
 	}
 	
@@ -1041,7 +1044,7 @@ ssize_t recv(int sockid, void *buf, size_t len, int flags) {
 
 	if (s->opts & NTY_TCP_NONBLOCK) {
 		if (!rcv->recvbuf || rcv->recvbuf->merged_len == 0) {
-			errno = -EAGAIN;
+			errno = EAGAIN;
 			return -1;
 		}
 	}
@@ -1079,7 +1082,7 @@ ssize_t recv(int sockid, void *buf, size_t len, int flags) {
 		default: {
 			pthread_mutex_unlock(&rcv->read_lock);
 			ret = -1;
-			errno = -EINVAL;
+			errno = EINVAL;
 			return ret;
 		}		
 	}
@@ -1114,7 +1117,7 @@ ssize_t send(int sockid, const void *buf, size_t len, int flags) {
 	}
 	
 	if (tcp->fdtable == NULL) {
-		errno = -EBADF;
+		errno = EBADF;
 		return -1;
 	}
 	struct _nty_socket *s = tcp->fdtable->sockfds[sockid];
@@ -1174,7 +1177,7 @@ ssize_t send(int sockid, const void *buf, size_t len, int flags) {
 
 	if (ret == 0 && (s->opts & NTY_TCP_NONBLOCK)) {
 		ret = -1;
-		errno = -EAGAIN;
+		errno = EAGAIN;
 	}
 #if 0
 	if (snd->snd_wnd > 0) {
@@ -1196,6 +1199,48 @@ ssize_t send(int sockid, const void *buf, size_t len, int flags) {
 	return ret;
 }
 
+int close(int sockid) {
+	nty_tcp_manager *tcp = nty_get_tcp_manager();
+	if (!tcp) return -1;
+
+	if (sockid < 0) {
+		errno = EBADF;
+		return -1;
+	}
+
+	//nty_socket_map *socket = &tcp->smap[sockid];
+	if (!tcp->fdtable) return -1;
+	
+	struct _nty_socket *s = tcp->fdtable->sockfds[sockid];
+	if (s->socktype == NTY_TCP_SOCK_UNUSED) {
+		errno = EINVAL;
+		return -1;
+	}
+	nty_trace_api("Socket %d, type:%d mtcp_close called.\n", sockid, s->socktype);
+
+	int ret = -1;
+	switch (s->socktype) {
+		case NTY_TCP_SOCK_STREAM: {
+			ret = nty_socket_close_stream(sockid);
+			break;
+		}
+		case NTY_TCP_SOCK_LISTENER: {
+			ret = nty_socket_close_listening(sockid);
+			break;
+		}
+		case NTY_TCP_SOCK_EPOLL: {
+			ret = nty_epoll_close_socket(sockid);
+		}
+		default: {
+			errno = EINVAL;
+			ret = -1;
+			break;
+		}
+	}
+
+	nty_socket_free(sockid);
+	return ret;
+}
 
 
 #endif

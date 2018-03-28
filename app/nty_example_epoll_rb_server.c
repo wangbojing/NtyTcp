@@ -86,7 +86,7 @@ int main() {
 
 	usleep(1);
 
-	int sockfd = nty_socket(AF_INET, SOCK_STREAM, 0);
+	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0) {
 		perror("socket");
 		return 1;
@@ -99,12 +99,12 @@ int main() {
 	addr.sin_port = htons(9096);
 	addr.sin_addr.s_addr = INADDR_ANY;
 
-	if(nty_bind(sockfd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+	if(bind(sockfd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
 		perror("bind");
 		return 2;
 	}
 
-	if (nty_listen(sockfd, 5) < 0) {
+	if (listen(sockfd, 5) < 0) {
 		return 3;
 	}
 
@@ -135,7 +135,7 @@ int main() {
 				memset(&client_addr, 0, sizeof(struct sockaddr_in));
 				socklen_t client_len = sizeof(client_addr);
 			
-				int clientfd = nty_accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
+				int clientfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
 				if (clientfd <= 0) continue;
 	
 				char str[INET_ADDRSTRLEN] = {0};
@@ -151,30 +151,32 @@ int main() {
 				int clientfd = events[i].data.fd;
 
 				char buffer[BUFFER_LENGTH] = {0};
-				int ret = nty_recv(clientfd, buffer, BUFFER_LENGTH, 0);
+				int ret = recv(clientfd, buffer, BUFFER_LENGTH, 0);
 				if (ret < 0) {
 					if (errno == EAGAIN || errno == EWOULDBLOCK) {
 						printf("read all data");
 					}
 					
-					nty_close(clientfd);
-					
-					ev.events = NTY_EPOLLIN | NTY_EPOLLET;
-					ev.data.fd = (uint64_t)clientfd;
-					epoll_ctl(epoll_fd, NTY_EPOLL_CTL_DEL, clientfd, &ev);
-				} else if (ret == 0) {
-					printf(" disconnect %d\n", clientfd);
-					
-					nty_close(clientfd);
-
 					ev.events = NTY_EPOLLIN | NTY_EPOLLET;
 					ev.data.fd = clientfd;
 					epoll_ctl(epoll_fd, NTY_EPOLL_CTL_DEL, clientfd, &ev);
 					
+					close(clientfd);
+				} else if (ret == 0) {
+					printf(" disconnect %d\n", clientfd);
+					
+					ev.events = NTY_EPOLLIN | NTY_EPOLLET;
+					ev.data.fd = clientfd;
+					epoll_ctl(epoll_fd, NTY_EPOLL_CTL_DEL, clientfd, &ev);
+
+					close(clientfd);
+
+					printf(" delete clientfd %d\n", clientfd);
+					
 					break;
 				} else {
 					printf("Recv: %s, %d Bytes\n", buffer, ret);
-					nty_send(clientfd, buffer, ret);
+					send(clientfd, buffer, ret, 0);
 				}
 
 			}

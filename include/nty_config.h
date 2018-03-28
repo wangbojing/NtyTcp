@@ -59,8 +59,8 @@
 
 
 
-#define NTY_SELF_IP		"192.168.1.147"//"192.168.1.108" //"192.168.1.132" //"192.168.1.131"  //
-#define NTY_SELF_IP_HEX	0x9301A8C0 //0x8301A8C0 //
+#define NTY_SELF_IP		"192.168.0.107"//"192.168.1.108" //"192.168.1.132" //"192.168.1.131"  //
+#define NTY_SELF_IP_HEX	0x6B00A8C0 //0x8301A8C0 //
 #define NTY_SELF_MAC	"00:0c:29:58:6f:f4"
 
 #define NTY_MAX_CONCURRENCY		1024
@@ -82,15 +82,15 @@
 
 //#define NTY_DEBUG 1
 #ifdef NTY_DEBUG
-#define ntydbg(format, ...) 		fprintf(stdout, " File:"__FILE__",line:%05d:"format, __LINE__, ##__VA_ARGS__)
-#define nty_trace_api(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_tcp(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_buffer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_eth(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_ip(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_timer(format, ...) 		fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_epoll(format, ...)	fprintf(stdout, format, ##__VA_ARGS__)
-#define nty_trace_socket(format, ...)	fprintf(stdout, format, ##__VA_ARGS__)
+#define ntydbg(format, ...) 			fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
+#define nty_trace_api(format, ...) 		fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
+#define nty_trace_tcp(format, ...) 		fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
+#define nty_trace_buffer(format, ...) 	fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
+#define nty_trace_eth(format, ...) 		fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
+#define nty_trace_ip(format, ...) 		fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
+#define nty_trace_timer(format, ...) 	fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
+#define nty_trace_epoll(format, ...)	fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
+#define nty_trace_socket(format, ...)	fprintf(stdout, " [File:"__FILE__", line:%05d] : "format, __LINE__, ##__VA_ARGS__)
 
 #else
 #define ntydbg(format, ...) 

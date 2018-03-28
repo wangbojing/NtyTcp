@@ -608,6 +608,7 @@ int nty_tcp_send_tcppkt(nty_tcp_stream *cur_stream,
 				cur_ts, cur_stream->snd->rto, cur_stream->snd->ts_rto, cur_stream->snd->mss);
 
 		AddtoRTOList(tcp, cur_stream);
+		nty_trace_tcp(" nty_tcp_send_tcppkt : %d\n", payloadlen);
 	}
 
 	return payloadlen;
@@ -622,7 +623,7 @@ static inline int nty_tcp_filter_synpkt(nty_tcp_manager *tcp, uint32_t ip, uint1
 	if (listener == NULL) return 0;
 
 	nty_trace_tcp("FilterSYNPacket 222:0x%x, port:%d\n", ip, port);
-	addr = &listener->socket->s_addr;
+	addr = &listener->s->s_addr;
 	if (addr->sin_port == port) {
 		if (addr->sin_addr.s_addr != INADDR_ANY) {
 			if (ip == addr->sin_addr.s_addr) {
@@ -650,6 +651,16 @@ static inline nty_tcp_stream *nty_tcp_passive_open(nty_tcp_manager *tcp, uint32_
 	cur_stream->snd->peer_wnd = window;
 	cur_stream->rcv_nxt = cur_stream->rcv->irs;
 	cur_stream->snd->cwnd = 1;
+
+#if 1
+	cur_stream->rcv->recvbuf = RBInit(tcp->rbm_rcv, cur_stream->rcv->irs + 1);
+	if (!cur_stream->rcv->recvbuf) {
+		cur_stream->state = NTY_TCP_CLOSED;
+		cur_stream->close_reason = TCP_NO_MEM;
+		
+	}
+#endif
+	
 	nty_tcp_parse_options(cur_stream, cur_ts, (uint8_t*)tcph+TCP_HEADER_LEN,
 		(tcph->doff << 2) - TCP_HEADER_LEN);
 	nty_trace_tcp("nty_tcp_passive_open : %d, %d\n", cur_stream->rcv_nxt, cur_stream->snd->mss);
@@ -850,7 +861,7 @@ static void nty_tcp_handle_syn_sent(nty_tcp_manager *tcp, uint32_t cur_ts,
 	if (tcph->rst && tcph->ack) {
 		cur_stream->state = NTY_TCP_CLOSE_WAIT;
 		cur_stream->close_reason = TCP_RESET;
-		if (cur_stream->socket) {
+		if (cur_stream->s) {
 			//.... raise error event
 		} else {
 			DestroyTcpStream(tcp, cur_stream);
@@ -870,7 +881,7 @@ static void nty_tcp_handle_syn_sent(nty_tcp_manager *tcp, uint32_t cur_ts,
 
 		nty_trace_tcp("Stream %d: TCP_ST_ESTABLISHED\n", cur_stream->id);
 
-		if (cur_stream->socket) {
+		if (cur_stream->s) {
 			//Raise Write Event
 		} else {
 			nty_tcppkt_alone(tcp, iph->saddr, tcph->dest, iph->daddr, tcph->source,
@@ -924,24 +935,23 @@ static void nty_tcp_handle_syn_rcvd(nty_tcp_manager *tcp, uint32_t cur_ts,
 		//
 		AddtoTimeoutList(tcp, cur_stream);
 
-		nty_trace_tcp(" [%s:%s:%d]: nty_tcp_handle_syn_rcvd : %x\n", 
-			__FILE__, __func__, __LINE__, listener->socket->epoll);
-		if (listener->socket ) {
+		nty_trace_tcp("nty_tcp_handle_syn_rcvd\n");
+		if (listener->s) {
 			//&& 
 			/*
-			 * should move to epoll for check socket->epoll type.
+			 * should move to epoll for check s->epoll type.
 			 */
 			//AddtoEpollEvent
 #if NTY_ENABLE_EPOLL_RB
 			if (tcp->ep) {
-				epoll_event_callback(tcp->ep, listener->socket->id, NTY_EPOLLIN);
+				epoll_event_callback(tcp->ep, listener->s->id, NTY_EPOLLIN);
 			} 
 #else
-			if (listener->socket->epoll & NTY_EPOLLIN) {
-				nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, listener->socket, NTY_EPOLLIN);
+			if (listener->s->epoll & NTY_EPOLLIN) {
+				nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, listener->s, NTY_EPOLLIN);
 			}
 #endif
-			if (!(listener->socket->opts & NTY_TCP_NONBLOCK)){
+			if (!(listener->s->opts & NTY_TCP_NONBLOCK)){
 				nty_tcp_flush_accept_event(listener);
 			}
 			
@@ -998,11 +1008,11 @@ void nty_tcp_handle_established(nty_tcp_manager *tcp, uint32_t cur_ts,
 
 #if NTY_ENABLE_EPOLL_RB
 			if (tcp->ep) {
-				epoll_event_callback(tcp->ep, cur_stream->socket->id, NTY_EPOLLIN);
+				epoll_event_callback(tcp->ep, cur_stream->s->id, NTY_EPOLLIN);
 			}
+			nty_trace_tcp(" epoll_event_callback : %d\n", cur_stream->s->opts);
 #endif
-			
-			if (cur_stream->socket && !(cur_stream->socket->opts & NTY_TCP_NONBLOCK)) {
+			if (cur_stream->s && !(cur_stream->s->opts & NTY_TCP_NONBLOCK)) {
 				nty_tcp_flush_read_event(cur_stream->rcv);
 			}
 			
@@ -1320,20 +1330,20 @@ static int nty_tcp_process_payload(nty_tcp_manager *tcp, nty_tcp_stream *cur_str
 
 	if (cur_stream->state == NTY_TCP_ESTABLISHED) {
 		//RaiseReadEvent
-		//cur_stream->socket
-		if (cur_stream->socket) {
-			// && (cur_stream->socket->epoll & NTY_EPOLLIN)
+		//cur_stream->s
+		if (cur_stream->s) {
+			// && (cur_stream->s->epoll & NTY_EPOLLIN)
 			// should move to epoll for check epoll type
 			//AddtoEpollEvent
 #if NTY_ENABLE_EPOLL_RB
 			if (tcp->ep) {
-				epoll_event_callback(tcp->ep, cur_stream->socket->id, NTY_EPOLLIN);
+				epoll_event_callback(tcp->ep, cur_stream->s->id, NTY_EPOLLIN);
 			} 
 			
 #else
-			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, cur_stream->socket, NTY_EPOLLIN);
+			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, cur_stream->s, NTY_EPOLLIN);
 #endif
-			if (!(cur_stream->socket->opts & NTY_TCP_NONBLOCK)) {
+			if (!(cur_stream->s->opts & NTY_TCP_NONBLOCK)) {
 				nty_tcp_flush_read_event(rcv);
 			}
 		}
@@ -2020,8 +2030,7 @@ int nty_tcp_handle_apicall(uint32_t cur_ts) {
 			}
 		}
 	}
-	//nty_trace_tcp("Handling reset connections. cnt: %d\n", cnt);
-
+	
 	cnt = 0;
 	int max_cnt = tcp->resetq_int->count;
 	while (cnt++ < max_cnt) {

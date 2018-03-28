@@ -151,6 +151,8 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event);
 int epoll_wait(int epid, struct epoll_event *events, int maxevents, int timeout);
 
 
+int nty_epoll_close_socket(int epid);
+
 
 
 

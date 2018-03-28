@@ -77,11 +77,10 @@ int epoll_create(int size) {
 
 	if (size <= 0) return -1;
 
-	
 	nty_tcp_manager *tcp = nty_get_tcp_manager();
 	if (!tcp) return -1;
-
-	nty_socket_map *epsocket = nty_allocate_socket(NTY_TCP_SOCK_EPOLL, 0);
+	
+	struct _nty_socket *epsocket = nty_socket_allocate(NTY_TCP_SOCK_EPOLL);
 	if (epsocket == NULL) {
 		nty_trace_epoll("malloc failed\n");
 		return -1;
@@ -93,6 +92,7 @@ int epoll_create(int size) {
 		return -1;
 	}
 
+	ep->rbcnt = 0;
 	RB_INIT(&ep->rbr);
 	LIST_INIT(&ep->rdlist);
 
@@ -138,11 +138,12 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event) {
 	nty_tcp_manager *tcp = nty_get_tcp_manager();
 	if (!tcp) return -1;
 
-	nty_socket_map *epsocket = &tcp->smap[epid];
-	nty_socket_map *socket = &tcp->smap[sockid];
-	
-	if (epsocket->socktype == NTY_TCP_SOCK_UNUSED || 
-		socket->socktype == NTY_TCP_SOCK_UNUSED) {
+	nty_trace_epoll(" epoll_ctl --> 1111111:%d, sockid:%d\n", epid, sockid);
+	struct _nty_socket *epsocket = tcp->fdtable->sockfds[epid];
+	struct _nty_socket *socket = tcp->fdtable->sockfds[sockid];
+
+	nty_trace_epoll(" epoll_ctl --> 1111111:%d, sockid:%d\n", epsocket->id, socket->id);
+	if (epsocket->socktype == NTY_TCP_SOCK_UNUSED) {
 		errno = -EBADF;
 		return -1;
 	}
@@ -151,6 +152,8 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event) {
 		errno = -EINVAL;
 		return -1;
 	}
+
+	nty_trace_epoll(" epoll_ctl --> eventpoll\n");
 
 	struct eventpoll *ep = (struct eventpoll*)epsocket->ep;
 	if (!ep || (!event && op != EPOLL_CTL_DEL)) {
@@ -183,6 +186,7 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event) {
 
 		epi = RB_INSERT(_epoll_rb_socket, &ep->rbr, epi);
 		assert(epi == NULL);
+		ep->rbcnt ++;
 		
 		pthread_mutex_unlock(&ep->mtx);
 
@@ -192,13 +196,21 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event) {
 
 		struct epitem tmp;
 		tmp.sockfd = sockid;
-		struct epitem *epi = RB_REMOVE(_epoll_rb_socket, &ep->rbr, &tmp);
+		struct epitem *epi = RB_FIND(_epoll_rb_socket, &ep->rbr, &tmp);
+		if (!epi) {
+			nty_trace_epoll("rbtree no exist\n");
+			pthread_mutex_unlock(&ep->mtx);
+			return -1;
+		}
+		
+		epi = RB_REMOVE(_epoll_rb_socket, &ep->rbr, epi);
 		if (!epi) {
 			nty_trace_epoll("rbtree is no exist\n");
 			pthread_mutex_unlock(&ep->mtx);
 			return -1;
 		}
 
+		ep->rbcnt --;
 		free(epi);
 		
 		pthread_mutex_unlock(&ep->mtx);
@@ -229,7 +241,9 @@ int epoll_wait(int epid, struct epoll_event *events, int maxevents, int timeout)
 	nty_tcp_manager *tcp = nty_get_tcp_manager();
 	if (!tcp) return -1;
 
-	nty_socket_map *epsocket = &tcp->smap[epid];
+	//nty_socket_map *epsocket = &tcp->smap[epid];
+	struct _nty_socket *epsocket = tcp->fdtable->sockfds[epid];
+	if (epsocket == NULL) return -1;
 
 	if (epsocket->socktype == NTY_TCP_SOCK_UNUSED) {
 		errno = -EBADF;
@@ -345,7 +359,7 @@ int epoll_event_callback(struct eventpoll *ep, int sockid, uint32_t event) {
 		return 1;
 	} 
 
-	printf("epoll_event_callback --> %d\n", epi->sockfd);
+	nty_trace_epoll("epoll_event_callback --> %d\n", epi->sockfd);
 	
 	pthread_spin_lock(&ep->lock);
 	epi->rdy = 1;
@@ -357,6 +371,59 @@ int epoll_event_callback(struct eventpoll *ep, int sockid, uint32_t event) {
 
 	pthread_cond_signal(&ep->cond);
 	pthread_mutex_unlock(&ep->cdmtx);
+	return 0;
+}
+
+static int epoll_destroy(struct eventpoll *ep) {
+
+	//remove rdlist
+
+	while (!LIST_EMPTY(&ep->rdlist)) {
+		struct epitem *epi = LIST_FIRST(&ep->rdlist);
+		LIST_REMOVE(epi, rdlink);
+	}
+	
+	//remove rbtree
+	pthread_mutex_lock(&ep->mtx);
+	
+	for (;;) {
+		struct epitem *epi = RB_MIN(_epoll_rb_socket, &ep->rbr);
+		if (epi == NULL) break;
+		
+		epi = RB_REMOVE(_epoll_rb_socket, &ep->rbr, epi);
+		free(epi);
+	}
+	pthread_mutex_unlock(&ep->mtx);
+
+	return 0;
+}
+
+int nty_epoll_close_socket(int epid) {
+
+	nty_tcp_manager *tcp = nty_get_tcp_manager();
+	if (!tcp) return -1;
+
+	struct eventpoll *ep = (struct eventpoll *)tcp->fdtable->sockfds[epid]->ep;
+	if (!ep) {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	epoll_destroy(ep);
+
+	pthread_mutex_lock(&ep->mtx);
+	tcp->ep = NULL;
+	tcp->fdtable->sockfds[epid]->ep = NULL;
+	pthread_cond_signal(&ep->cond);
+	pthread_mutex_unlock(&ep->mtx);
+
+	pthread_cond_destroy(&ep->cond);
+	pthread_mutex_destroy(&ep->mtx);
+
+	pthread_spin_destroy(&ep->lock);
+
+	free(ep);
+
 	return 0;
 }
 

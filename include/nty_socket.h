@@ -140,6 +140,10 @@ struct _nty_socket* nty_socket_get(int sockid);
 
 struct _nty_socket_table * nty_socket_init_fdtable(void);
 
+int nty_socket_close_listening(int sockid);
+
+int nty_socket_close_stream(int sockid);
+
 
 
 #endif

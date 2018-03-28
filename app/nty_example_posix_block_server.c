@@ -85,6 +85,7 @@ int main() {
 		return 1;
 	}
 
+	printf("socket success\n");
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(struct sockaddr_in));
 
@@ -97,6 +98,7 @@ int main() {
 		return 2;
 	}
 
+	printf("listen\n");
 	if (listen(sockfd, 5) < 0) {
 		return 3;
 	}
@@ -104,7 +106,8 @@ int main() {
 	struct sockaddr_in client_addr;
 	memset(&client_addr, 0, sizeof(struct sockaddr_in));
 	socklen_t client_len = sizeof(client_addr);
-	
+
+	printf("accept\n");
 	int clientfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
 	char str[INET_ADDRSTRLEN] = {0};
 	printf("recv from %s at port %d, sockfd:%d, clientfd:%d\n", inet_ntop(AF_INET, &client_addr.sin_addr, str, sizeof(str)),

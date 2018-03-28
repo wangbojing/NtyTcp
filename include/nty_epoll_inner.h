@@ -139,6 +139,8 @@ typedef struct _epoll_rb_socket ep_rb_tree;
 
 struct eventpoll {
 	ep_rb_tree rbr;
+	int rbcnt;
+	
 	LIST_HEAD( ,epitem) rdlist;
 	int rdnum;
 
@@ -154,6 +156,7 @@ struct eventpoll {
 
 
 int epoll_event_callback(struct eventpoll *ep, int sockid, uint32_t event);
+
 
 
 #endif

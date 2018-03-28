@@ -353,15 +353,17 @@ void nty_socket_free(int sockid) {
 	pthread_spin_lock(&sock_table->lock);
 
 	char byte = nty_socket_unuse_id(sock_table->open_fds, sockid);
-	nty_trace_socket("nty_socket_free --> nty_socket_unuse_id : %x\n", byte);
 
 	sock_table->cur_idx = nty_socket_set_start(sockid);
+	nty_trace_socket("nty_socket_free --> nty_socket_unuse_id : %x, %d\n",
+		byte, sock_table->cur_idx);
 	
 	pthread_spin_unlock(&sock_table->lock);
 
 	free(s);
 
 	UNUSED(byte);
+	nty_trace_socket("nty_socket_free --> Exit\n");
 
 	return ;
 }
@@ -369,9 +371,104 @@ void nty_socket_free(int sockid) {
 struct _nty_socket* nty_socket_get(int sockid) {
 
 	struct _nty_socket_table *sock_table = nty_socket_get_fdtable();
+	if(sock_table == NULL) return NULL;
 
 	return sock_table->sockfds[sockid];
 }
+
+int nty_socket_close_stream(int sockid) {
+	
+	nty_tcp_manager *tcp = nty_get_tcp_manager();
+	if (!tcp) return -1;
+
+	struct _nty_socket *s = nty_socket_get(sockid);
+	if (s == NULL) return -1;
+
+	nty_tcp_stream *cur_stream = s->stream;
+	if (!cur_stream) {
+		nty_trace_api("Socket %d: stream does not exist.\n", sockid);
+		errno = ENOTCONN;
+		return -1;
+	}
+
+	if (cur_stream->closed) {
+		nty_trace_api("Socket %d (Stream %u): already closed stream\n", 
+				sockid, cur_stream->id);
+		return 0;
+	}
+	cur_stream->closed = 1;
+	
+	nty_trace_api("Stream %d: closing the stream.\n", cur_stream->id);
+	cur_stream->s = NULL;
+
+	if (cur_stream->state == NTY_TCP_CLOSED) {
+		printf("Stream %d at TCP_ST_CLOSED. destroying the stream.\n", 
+				cur_stream->id);
+		
+		StreamEnqueue(tcp->destroyq, cur_stream);
+		tcp->wakeup_flag = 1;
+		
+		return 0;
+	} else if (cur_stream->state == NTY_TCP_SYN_SENT) {
+		
+		StreamEnqueue(tcp->destroyq, cur_stream);		
+		tcp->wakeup_flag = 1;
+		
+		return -1;
+	} else if (cur_stream->state != NTY_TCP_ESTABLISHED &&
+			   cur_stream->state != NTY_TCP_CLOSE_WAIT) {
+		nty_trace_api("Stream %d at state %d\n", 
+				cur_stream->id, cur_stream->state);
+		errno = -EBADF;
+		return -1;
+	}
+
+	cur_stream->snd->on_closeq = 1;
+	int ret = StreamEnqueue(tcp->closeq, cur_stream);
+	tcp->wakeup_flag = 1;
+
+	if (ret < 0) {
+		nty_trace_api("(NEVER HAPPEN) Failed to enqueue the stream to close.\n");
+		errno = EAGAIN;
+		return -1;
+	}
+
+	return 0;
+}
+
+int nty_socket_close_listening(int sockid) {
+
+	nty_tcp_manager *tcp = nty_get_tcp_manager();
+	if (!tcp) return -1;
+
+	struct _nty_socket *s = nty_socket_get(sockid);
+	if (s == NULL) return -1;
+	
+	struct _nty_tcp_listener *listener = s->listener;
+	if (!listener) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (listener->acceptq) {
+		DestroyStreamQueue(listener->acceptq);
+		listener->acceptq = NULL;
+	}
+
+	pthread_mutex_lock(&listener->accept_lock);
+	pthread_cond_signal(&listener->accept_cond);
+	pthread_mutex_unlock(&listener->accept_lock);
+
+	pthread_cond_destroy(&listener->accept_cond);
+	pthread_mutex_destroy(&listener->accept_lock);
+
+	free(listener);
+	s->listener = NULL;
+
+	return 0;
+}
+
+
 
 #endif
 
