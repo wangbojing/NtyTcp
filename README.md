@@ -1,6 +1,9 @@
 
 ![image](https://github.com/wangbojing/NtyTcp/blob/master/doc/icon.jpg)
 
+
+具体详情还可以移步 http://www.ntytcp.com
+
 # netmap install
  
 $ git clone https://github.com/wangbojing/netmap.git
