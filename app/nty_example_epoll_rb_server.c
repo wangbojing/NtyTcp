@@ -115,7 +115,6 @@ int main() {
 	ev.data.fd = sockfd;
 	epoll_ctl(epoll_fd, NTY_EPOLL_CTL_ADD, sockfd, &ev);
 
-	printf(" 11111 epoll_ctl\n");
 	while (1) {
 
 		int nready = epoll_wait(epoll_fd, events, EPOLL_SIZE, -1);
