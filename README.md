@@ -27,9 +27,13 @@ $ sudo make install
 2. problem : cannot stat 'bridge': No such or directory
 
 	$ make clean
+	
 	$ cd build-apps/bridge
+	
 	$ gcc -O2 -pipe -Werror -Wall -Wunused-function -I ../../sys -I ../../apps/include -Wextra    ../../apps/bridge/bridge.c  -lpthread -lrt    -o bridge
+	
 	$ sudo make && make install
+	
 
 # NtyTcp
 netmap, dpdp, pf_ring, Tcp Stack for Userspace 
