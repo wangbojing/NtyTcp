@@ -142,7 +142,7 @@ int epoll_ctl(int epid, int op, int sockid, struct epoll_event *event) {
 	struct _nty_socket *epsocket = tcp->fdtable->sockfds[epid];
 	//struct _nty_socket *socket = tcp->fdtable->sockfds[sockid];
 
-	nty_trace_epoll(" epoll_ctl --> 1111111:%d, sockid:%d\n", epsocket->id, sockid);
+	//nty_trace_epoll(" epoll_ctl --> 1111111:%d, sockid:%d\n", epsocket->id, sockid);
 	if (epsocket->socktype == NTY_TCP_SOCK_UNUSED) {
 		errno = -EBADF;
 		return -1;
