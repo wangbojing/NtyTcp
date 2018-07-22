@@ -38,7 +38,7 @@ $ sudo make install
 	```
 
 # NtyTcp
-netmap, dpdp, pf_ring, Tcp Stack for Userspace 
+netmap, dpdk, pf_ring, Tcp Stack for Userspace 
 
 compile:
 ```
