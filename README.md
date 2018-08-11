@@ -27,6 +27,7 @@ $ sudo make install
 	$ dos2unix ./LINUX/configure
 	```
 # 2. problem : cannot stat 'bridge': No such or directory
+
 	```
 	$ make clean
 	
@@ -47,13 +48,15 @@ $ sudo apt-get install libhugetlbfs-dev
 $ make
 ```
 
-update NtyTcp/include/nty_config.h  
+update NtyTcp/include/nty_config.h 
+```
 
 #define NTY_SELF_IP		"192.168.0.106" 	//your ip
 
 #define NTY_SELF_IP_HEX	0x6A00A8C0 			//your ip hex.
 
 #define NTY_SELF_MAC	"00:0c:29:58:6f:f4" //your mac
+```
 
 block server run:
 ```
