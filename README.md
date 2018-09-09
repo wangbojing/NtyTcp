@@ -68,8 +68,7 @@ $ ./bin/nty_example_epoll_rb_server
 ```
 
 # Reference
-* [Level-IP](https://github.com/saminiir/level-ip) 
-* [informative blog](http://www.saminiir.com/)
+* [Level-IP](https://github.com/saminiir/level-ip) and [saminiir blog](http://www.saminiir.com/)
 * [Linux kernel TCP/IP stack](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/net/ipv4)
 
 if you discover bug to sending email to 1989wangbojing@163.com. 
