@@ -18,7 +18,7 @@ $ sudo make install
 
 #### Troubleshooting
 
-# 1. problem : configure --> /bin/sh^M. 
+### 1. problem : configure --> /bin/sh^M. 
 
 	you should run . 
 ```
@@ -26,7 +26,7 @@ $ dos2unix configure
 
 $ dos2unix ./LINUX/configure
 ```
-# 2. problem : cannot stat 'bridge': No such or directory
+### 2. problem : cannot stat 'bridge': No such or directory
 
 ```
 $ make clean
@@ -38,7 +38,7 @@ $ gcc -O2 -pipe -Werror -Wall -Wunused-function -I ../../sys -I ../../apps/inclu
 $ sudo make && make install
 ```
 
-# NtyTcp
+## NtyTcp
 netmap, dpdk, pf_ring, Tcp Stack for Userspace 
 
 compile:
@@ -67,7 +67,7 @@ epoll server run:
 $ ./bin/nty_example_epoll_rb_server
 ```
 
-# Reference
+## Reference
 * [Level-IP](https://github.com/saminiir/level-ip) and [saminiir blog](http://www.saminiir.com/)
 * [Linux kernel TCP/IP stack](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/net/ipv4)
 
