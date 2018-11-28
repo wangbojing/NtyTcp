@@ -1,8 +1,7 @@
 
 ![image](https://github.com/wangbojing/NtyTcp/blob/master/doc/icon.jpg)
 
-
-具体详情还可以移步 http://www.ntytcp.com
+![image](https://github.com/wangbojing/NtyTcp/blob/master/doc/arch.png)
 
 ## netmap install
 ```
