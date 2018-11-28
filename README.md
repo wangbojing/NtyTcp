@@ -1,6 +1,4 @@
 
-![image](https://github.com/wangbojing/NtyTcp/blob/master/doc/icon.jpg)
-
 ![image](https://github.com/wangbojing/NtyTcp/blob/master/doc/arch.png)
 
 ## netmap install
