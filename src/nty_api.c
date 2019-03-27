@@ -683,6 +683,7 @@ int nty_close(int sockid) {
 		}
 		case NTY_TCP_SOCK_EPOLL: {
 			ret = nty_close_epoll_socket(sockid);
+			break;
 		}
 		default: {
 			errno = EINVAL;
@@ -1230,6 +1231,7 @@ int close(int sockid) {
 		}
 		case NTY_TCP_SOCK_EPOLL: {
 			ret = nty_epoll_close_socket(sockid);
+			break;
 		}
 		default: {
 			errno = EINVAL;

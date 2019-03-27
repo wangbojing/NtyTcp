@@ -102,7 +102,7 @@ int str2mac(char *mac, char *str) {
 	unsigned char value = 0x0;
 	int i = 0;
 
-	while (p != '\0') {
+	while (*p != '\0') {
 		
 		if (*p == ':') {
 			mac[i++] = value;
