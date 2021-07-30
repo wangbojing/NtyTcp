@@ -1,5 +1,5 @@
 
-![image](https://github.com/wangbojing/NtyTcp/blob/master/doc/arch.png)
+![image](https://www.0voice.com/uiwebsite/linux/arch.png)
 
 [配套视频讲解](https://ke.qq.com/course/2739583?tuin=1bf84273)
 
