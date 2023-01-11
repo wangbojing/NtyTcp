@@ -70,7 +70,7 @@ $ ./bin/nty_example_epoll_rb_server
 * [Level-IP](https://github.com/saminiir/level-ip) and [saminiir blog](http://www.saminiir.com/)
 * [Linux kernel TCP/IP stack](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/net/ipv4)
 
-if you discover bug to sending email to 1989wangbojing@163.com. 
+if you discover bug to sending email to wangbojing@0voice.com. 
 
-also, want to be an NtyTcper, so you can sent email to 1989wangbojing@163.com .
+also, want to be an NtyTcper, so you can sent email to wangbojing@0voice.com .
 
