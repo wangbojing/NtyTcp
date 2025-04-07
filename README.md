@@ -1,8 +1,6 @@
 
 ![image](https://www.0voice.com/uiwebsite/linux/arch.png)
 
-[配套视频讲解](https://ke.qq.com/course/6032210#term_id=106261530)
-
 ## netmap install
 ```
 $ git clone https://github.com/wangbojing/netmap.git
